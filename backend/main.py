@@ -8,7 +8,13 @@ app = FastAPI(title="Fact Checker Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*", "http://localhost:*"],
+    allow_origins=[
+        "chrome-extension://*",
+        "http://localhost:*",
+        "https://www.facebook.com",
+        "https://*.facebook.com",
+        "https://facebook.com"
+    ],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
     allow_credentials=True,
