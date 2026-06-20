@@ -15,8 +15,9 @@ A Chrome extension that adds fact-checking capabilities to Facebook. Click a "Fa
 - Python 3.8+
 - Chrome browser
 - API keys (free tier available):
-  - **ClaimBuster API**: Get free key at https://idir.uta.edu/claimbuster/
-  - **Google Fact Check Tools API**: Get free key at https://console.developers.google.com/
+  - **Google Fact Check Tools API** (required): Get free key at https://console.developers.google.com/
+  - **ClaimBuster API** (optional): Get free key at https://idir.uta.edu/claimbuster/
+    - If not provided, the backend uses simple sentence splitting instead
 
 ### Backend Setup
 
