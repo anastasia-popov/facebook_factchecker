@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Facebook Fact Checker",
+  "version": "1.0",
+  "description": "Adds a Fact Check button to Facebook feed posts for instant verification.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "http://localhost:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
