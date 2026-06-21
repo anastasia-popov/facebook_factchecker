@@ -127,11 +127,28 @@
 
   <button id="saveBtn">Save Settings</button>
 
-  <div class="info-text">
-    To get started:<br>
-    1. Get Claude API key from <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a><br>
-    2. Paste it above<br>
-    3. Visit Facebook and click "Fact Check" on any post
+  <hr style="margin: 16px 0; border: none; border-top: 1px solid #e4e6eb;">
+
+  <div class="form-group">
+    <label>Screenshot OCR</label>
+    <button id="screenshotBtn" style="background-color: #31a24c; margin-bottom: 8px;">📸 Select Area & OCR</button>
+    <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
+      Click to select an area on the page for text extraction
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="imageUrl">Image URL or Paste Screenshot</label>
+    <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
+    <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
+      📋 Paste image from clipboard (Ctrl+V) or paste image URL
+    </div>
+  </div>
+
+  <button id="ocrBtn" style="background-color: #31a24c;">Extract Text & Fact-Check</button>
+
+  <div class="info-text" style="margin-top: 12px;">
+    <strong>For Instagram:</strong> Right-click image → Copy image link → Paste above → Click "Extract Text"
   </div>
 </body>
 <script src="popup.js"></script>
