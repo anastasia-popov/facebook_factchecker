@@ -1,7 +1,8 @@
 import httpx
 import json
 import logging
-from typing import Optional
+import re
+from typing import Optional, Any
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -9,6 +10,24 @@ logger = logging.getLogger(__name__)
 SERPER_API_URL = "https://google.serper.dev/search"
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 CLAUDE_MODEL = "claude-opus-4-8"
+
+# Tool definitions for Claude
+TOOLS = [
+    {
+        "name": "web_search",
+        "description": "Search the web for information about a claim or topic",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to perform"
+                }
+            },
+            "required": ["query"]
+        }
+    }
+]
 
 
 async def search_web(query: str) -> list[dict]:
@@ -60,14 +79,14 @@ async def fetch_and_summarize_url(url: str) -> str:
 
 
 async def fact_check_with_claude(text: str) -> str:
-    """Send text to Claude for comprehensive fact-checking with web search context."""
+    """Send text to Claude for comprehensive fact-checking with web search tools."""
     if not settings.claude_api_key:
         raise Exception("CLAUDE_API_KEY not configured")
 
     # Extract key claims from text (simple split by sentences)
     sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 10][:5]
 
-    # Search the web for each claim
+    # Initial search context
     search_context = []
     for sentence in sentences[:3]:  # Limit to top 3 claims
         logger.debug(f"Searching web for: {sentence[:50]}...")
@@ -78,7 +97,7 @@ async def fact_check_with_claude(text: str) -> str:
                 "search_results": results
             })
 
-    # Build the prompt for Claude
+    # Build the initial prompt for Claude
     prompt = f"""Please fact-check the following social media post and provide a comprehensive analysis.
 
 POST TEXT:
@@ -87,7 +106,7 @@ POST TEXT:
 """
 
     if search_context:
-        prompt += "WEB SEARCH CONTEXT:\n"
+        prompt += "INITIAL WEB SEARCH CONTEXT:\n"
         for item in search_context:
             prompt += f"\nClaim: {item['claim']}\n"
             prompt += "Web search results:\n"
@@ -97,46 +116,97 @@ POST TEXT:
     prompt += """
 INSTRUCTIONS:
 1. Identify key claims in the post
-2. For each claim, determine if it's True, False, Misleading, or Unverified based on the search results
-3. Provide sources where found
+2. For each claim, determine if it's True, False, Misleading, or Unverified
+3. Provide sources with clickable URLs where found
 4. Give an overall assessment of the post's accuracy
-5. Recommend further fact-checking if needed
+5. For each claim you want to verify further, use the web_search tool to gather more information
+6. After gathering additional information, provide recommendations for further fact-checking
 
-Format your response as a structured analysis."""
+Use the web_search tool whenever you need to verify a claim or find specific information."""
 
     try:
-        logger.debug(f"Sending fact-check request to Claude (text length: {len(text)})")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                CLAUDE_API_URL,
-                headers={
-                    "x-api-key": settings.claude_api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                    "anthropic-dangerous-direct-browser-access": "true"
-                },
-                json={
-                    "model": CLAUDE_MODEL,
-                    "max_tokens": 2000,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                }
-            )
+        logger.debug(f"Starting fact-check with Claude (text length: {len(text)})")
 
-            if not response.is_success:
-                error_data = response.json()
-                logger.error(f"Claude API error: {error_data}")
-                raise Exception(f"Claude API error: {error_data.get('error', {}).get('message', 'Unknown error')}")
+        # Message history for multi-turn interaction
+        messages = [{"role": "user", "content": prompt}]
 
-            data = response.json()
-            result = data["content"][0]["text"]
-            logger.debug(f"Claude analysis complete (length: {len(result)})")
-            return result
+        # Tool use loop
+        max_iterations = 5
+        for iteration in range(max_iterations):
+            logger.debug(f"Claude iteration {iteration + 1}")
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    CLAUDE_API_URL,
+                    headers={
+                        "x-api-key": settings.claude_api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                        "anthropic-dangerous-direct-browser-access": "true"
+                    },
+                    json={
+                        "model": CLAUDE_MODEL,
+                        "max_tokens": 4000,
+                        "tools": TOOLS,
+                        "messages": messages
+                    }
+                )
+
+                if not response.is_success:
+                    error_data = response.json()
+                    logger.error(f"Claude API error: {error_data}")
+                    raise Exception(f"Claude API error: {error_data.get('error', {}).get('message', 'Unknown error')}")
+
+                data = response.json()
+                assistant_message = {"role": "assistant", "content": data["content"]}
+                messages.append(assistant_message)
+
+                # Check if Claude wants to use tools
+                has_tool_use = False
+                tool_results = []
+
+                for content_block in data["content"]:
+                    if content_block.get("type") == "tool_use":
+                        has_tool_use = True
+                        tool_name = content_block.get("name")
+                        tool_input = content_block.get("input")
+                        tool_use_id = content_block.get("id")
+
+                        logger.debug(f"Claude requested tool: {tool_name}")
+
+                        if tool_name == "web_search":
+                            query = tool_input.get("query")
+                            logger.debug(f"Performing web search: {query}")
+                            results = await search_web(query)
+
+                            # Format results for Claude
+                            result_text = f"Search results for '{query}':\n"
+                            for i, result in enumerate(results, 1):
+                                result_text += f"{i}. {result['title']}\n   {result['snippet']}\n   URL: {result['url']}\n"
+
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": result_text
+                            })
+
+                # If Claude used tools, send results back
+                if has_tool_use and tool_results:
+                    messages.append({"role": "user", "content": tool_results})
+                else:
+                    # Claude finished without needing more tools
+                    break
+
+        # Extract final text response
+        final_response = ""
+        for content_block in messages[-1]["content"]:
+            if content_block.get("type") == "text":
+                final_response = content_block.get("text", "")
+                break
+
+        logger.debug(f"Claude analysis complete (length: {len(final_response)})")
+        return final_response
 
     except Exception as e:
-        logger.error(f"Claude API request failed: {e}", exc_info=True)
+        logger.error(f"Claude fact-check request failed: {e}", exc_info=True)
         raise

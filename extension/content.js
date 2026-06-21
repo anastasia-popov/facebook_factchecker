@@ -244,6 +244,20 @@
     container.appendChild(overlay);
   }
 
+  function parseTextWithLinks(text) {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, idx) => {
+      if (part.match(urlRegex)) {
+        // Remove trailing punctuation if present
+        const cleanUrl = part.replace(/[.,;:!?)]$/, '');
+        return `<a href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener noreferrer" style="color: #1877f2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
+      }
+      return escapeHtml(part);
+    }).join('');
+  }
+
   function showClaudeResults(container, responseText) {
     console.log('showClaudeResults called with text length:', responseText.length);
     console.log('Container:', container);
@@ -262,15 +276,21 @@
       font-size: 13px !important;
       color: #050505 !important;
       z-index: 1000 !important;
+      line-height: 1.5 !important;
     `;
+
+    const responseHtml = parseTextWithLinks(responseText)
+      .replace(/\n/g, '<br>')
+      .replace(/^##\s+(.+)$/gm, '<h3 style="margin: 12px 0 6px 0 !important; font-size: 15px !important; font-weight: 600 !important;">$1</h3>')
+      .replace(/^\*\*(.+?)\*\*:/gm, '<strong style="color: #1877f2 !important;">$1:</strong>');
 
     overlay.innerHTML = `
       <div class="fc-header">
         <span class="fc-title">Claude Fact-Check Analysis</span>
         <button class="fc-close" aria-label="Close">✕</button>
       </div>
-      <div class="fc-claude-response">
-        ${escapeHtml(responseText).replace(/\n/g, '<br>')}
+      <div class="fc-claude-response" style="max-height: 500px !important; overflow-y: auto !important;">
+        ${responseHtml}
       </div>
     `;
 
