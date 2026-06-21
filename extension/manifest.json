@@ -1,9 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Facebook Fact Checker",
-  "version": "1.0",
-  "description": "Adds a Fact Check button to Facebook feed posts for instant verification.",
+  "name": "Fact Checker",
+  "version": "1.1",
+  "description": "Fact-check text and images on any website with Claude AI or Google Fact Check API.",
   "permissions": ["storage", "contextMenus"],
+  "web_accessible_resources": [
+    {
+      "resources": ["tesseract-core.wasm.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "host_permissions": [
     "https://www.facebook.com/*",
     "http://localhost:8000/*"

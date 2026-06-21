@@ -1,6 +1,74 @@
 (function () {
   const BACKEND_URL = 'http://localhost:8000';
-  console.log('🔍 Facebook Fact Checker: Content script loaded');
+  console.log('🔍 Fact Checker: Content script loaded');
+
+  // Load Tesseract.js for OCR
+  function loadTesseract() {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
+      script.onload = () => {
+        console.log('Tesseract.js loaded');
+        resolve();
+      };
+      script.onerror = () => {
+        console.error('Failed to load Tesseract.js');
+        reject(new Error('Failed to load OCR library'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  async function performOCR(imageUrl) {
+    console.log('Starting OCR on image:', imageUrl);
+
+    try {
+      // Load Tesseract if not already loaded
+      if (!window.Tesseract) {
+        await loadTesseract();
+      }
+
+      const { Tesseract } = window;
+
+      // Show status
+      const statusDiv = document.createElement('div');
+      statusDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 999999;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      `;
+      statusDiv.textContent = 'Extracting text from image...';
+      document.body.appendChild(statusDiv);
+
+      // Fetch the image and convert to blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+
+      // Create worker and perform OCR
+      const worker = await Tesseract.createWorker();
+      const result = await worker.recognize(blob);
+      const extractedText = result.data.text;
+
+      await worker.terminate();
+      statusDiv.remove();
+
+      console.log('OCR complete, extracted text length:', extractedText.length);
+      console.log('Extracted text preview:', extractedText.substring(0, 100));
+
+      return extractedText;
+    } catch (error) {
+      console.error('OCR error:', error);
+      statusDiv.remove();
+      throw error;
+    }
+  }
 
   function isDetailPage() {
     const url = window.location.href;
@@ -533,17 +601,24 @@
     if (request.action === 'factCheckText') {
       const selectedText = request.text;
       console.log('Fact-checking selected text:', selectedText.substring(0, 100));
+      performFactCheck(selectedText, document.body);
+    } else if (request.action === 'factCheckImage') {
+      const imageUrl = request.imageUrl;
+      console.log('Extracting text from image:', imageUrl);
 
-      // Find modal or create a container for results
-      let modal = document.querySelector('div[aria-modal="true"]');
-      let container = modal;
-
-      if (!modal) {
-        // If no modal, use body as container
-        container = document.body;
-      }
-
-      performFactCheck(selectedText, container);
+      performOCR(imageUrl)
+        .then(extractedText => {
+          if (extractedText && extractedText.trim().length > 0) {
+            console.log('OCR successful, performing fact-check on extracted text');
+            performFactCheck(extractedText, document.body);
+          } else {
+            showError(document.body, 'No text found in the image. Please try another image.');
+          }
+        })
+        .catch(error => {
+          console.error('OCR failed:', error);
+          showError(document.body, `OCR Error: ${error.message}`);
+        });
     }
   });
 

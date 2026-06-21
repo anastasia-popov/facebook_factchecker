@@ -4,11 +4,18 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed/updated');
   chrome.storage.local.set({ claudeApiKey: '' });
 
-  // Create context menu for fact-checking (works on all websites)
+  // Create context menu for text fact-checking
   chrome.contextMenus.create({
     id: 'factcheck-selection',
     title: '🔍 Fact Check Selection',
     contexts: ['selection']
+  });
+
+  // Create context menu for image OCR fact-checking
+  chrome.contextMenus.create({
+    id: 'factcheck-image',
+    title: '🔍 Extract & Fact Check Image Text',
+    contexts: ['image']
   });
 });
 
@@ -16,9 +23,17 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'factcheck-selection' && info.selectionText) {
     // Send selected text to content script
+    console.log('User selected text for fact-checking');
     chrome.tabs.sendMessage(tab.id, {
       action: 'factCheckText',
       text: info.selectionText
+    });
+  } else if (info.menuItemId === 'factcheck-image' && info.srcUrl) {
+    // Send image URL to content script for OCR
+    console.log('User selected image for OCR fact-checking');
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'factCheckImage',
+      imageUrl: info.srcUrl
     });
   }
 });
