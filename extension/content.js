@@ -7,33 +7,181 @@
     return url.includes('/permalink/') || url.includes('/posts/');
   }
 
-  function extractPostText() {
-    // On detail page, find the main post article
-    const articles = document.querySelectorAll('[role="article"]');
+  function reverseImageSearch(imageUrl, service = 'tineye') {
+    let searchUrl;
+    const encodedUrl = encodeURIComponent(imageUrl);
 
-    if (articles.length === 0) {
-      console.log('No articles found');
+    if (service === 'tineye') {
+      searchUrl = `https://tineye.com/search?url=${encodedUrl}`;
+    } else if (service === 'google') {
+      // Google Images reverse search using the upload form method
+      searchUrl = `https://www.google.com/searchbyimage?image_url=${encodedUrl}`;
+    }
+
+    console.log(`Opening ${service} reverse image search...`);
+    console.log(`URL: ${searchUrl}`);
+    window.open(searchUrl, '_blank');
+  }
+
+  async function extractPostText(article) {
+    console.log('extractPostText called');
+
+    if (!article) {
+      console.log('No article provided');
       return '';
     }
 
-    // Use the first article (main post on detail page)
-    const article = articles[0];
-    console.log('Found article, extracting text');
-
     try {
-      const clone = article.cloneNode(true);
+      // Wait for loading to complete (max 5 seconds)
+      console.log('Waiting for post to load...');
+      let attempts = 0;
+      while (attempts < 50) {
+        const loadingElement = article.querySelector('[aria-label="Loading..."]');
+        if (!loadingElement) {
+          console.log('Post loaded after', attempts * 100, 'ms');
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
 
-      // Remove toolbars, buttons, etc
-      clone.querySelectorAll('[role="toolbar"]').forEach(el => el.remove());
-      clone.querySelectorAll('[role="button"]').forEach(el => el.remove());
-      clone.querySelectorAll('[aria-label*="comment" i]').forEach(el => el.remove());
-      clone.querySelectorAll('[aria-label*="reaction" i]').forEach(el => el.remove());
-      clone.querySelectorAll('[aria-label*="like" i]').forEach(el => el.remove());
-      clone.querySelectorAll('[aria-label*="share" i]').forEach(el => el.remove());
+      // Debug: check article properties
+      const articleStyles = getComputedStyle(article);
+      console.log('Article display:', articleStyles.display);
+      console.log('Article visibility:', articleStyles.visibility);
+      console.log('Article opacity:', articleStyles.opacity);
+      console.log('Article children count:', article.children.length);
+      console.log('Article HTML length:', article.innerHTML.length);
+      console.log('Article HTML (first 500):', article.innerHTML.substring(0, 500));
 
-      const text = clone.innerText.trim();
-      console.log('Extracted text length:', text.length);
-      console.log('Text preview:', text.substring(0, 150));
+      // Find all post text paragraphs within the modal
+      let text = '';
+      const modal = document.querySelector('div[aria-modal="true"]');
+
+      if (modal) {
+        console.log('✓ Found modal');
+
+        // Extract text
+        const postTextElements = modal.querySelectorAll('div[dir="auto"][style*="text-align: start"]');
+        console.log('Found', postTextElements.length, 'text elements');
+
+        if (postTextElements.length > 0) {
+          // Combine all text elements
+          const textParts = Array.from(postTextElements).map(el =>
+            el.innerText || el.textContent || ''
+          );
+          text = textParts.filter(t => t.trim().length > 0).join('\n');
+
+          console.log('✓ Found post text elements in modal');
+          console.log('Post text length:', text.length);
+          console.log('Text preview:', text.substring(0, 300));
+        } else {
+          console.log('✗ Post text elements not found in modal');
+        }
+
+        // Extract post images only (not avatars)
+        const postImages = modal.querySelectorAll('img[data-imgperflogname="feedImage"]');
+        if (postImages.length > 0) {
+          console.log('Found', postImages.length, 'post image(s) in modal');
+
+          // Create reverse search panel
+          const imageLinksDiv = document.createElement('div');
+          imageLinksDiv.id = 'fc-image-search-links';
+          imageLinksDiv.style.cssText = `
+            position: fixed !important;
+            bottom: 20px !important;
+            right: 20px !important;
+            background: white !important;
+            border: 2px solid #1877f2 !important;
+            border-radius: 8px !important;
+            padding: 12px !important;
+            z-index: 999998 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+            max-width: 200px !important;
+          `;
+
+          const title = document.createElement('div');
+          title.textContent = 'Reverse Image Search';
+          title.style.cssText = `
+            font-weight: bold !important;
+            margin-bottom: 8px !important;
+            color: #1877f2 !important;
+            font-size: 12px !important;
+          `;
+          imageLinksDiv.appendChild(title);
+
+          postImages.forEach((img, idx) => {
+            // Try to get the original image URL from various sources
+            let imgSrc = img.src || img.getAttribute('data-src') || img.getAttribute('data-image-url');
+
+            // Try to get full resolution by checking parent elements
+            const picture = img.closest('picture');
+            if (picture) {
+              const sources = picture.querySelectorAll('source');
+              for (const source of sources) {
+                const srcset = source.getAttribute('srcset');
+                if (srcset) {
+                  imgSrc = srcset.split(' ')[0];
+                  break;
+                }
+              }
+            }
+
+            console.log(`🖼️ Image ${idx}: ${imgSrc}`);
+
+            if (imgSrc && imgSrc.length > 10) {
+              const btnTineye = document.createElement('button');
+              btnTineye.textContent = `Image ${idx} - TinEye`;
+              btnTineye.style.cssText = `
+                display: block !important;
+                width: 100% !important;
+                margin: 4px 0 !important;
+                padding: 8px !important;
+                background: #1877f2 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 4px !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+              `;
+              btnTineye.onclick = () => reverseImageSearch(imgSrc, 'tineye');
+              imageLinksDiv.appendChild(btnTineye);
+
+              const btnGoogle = document.createElement('button');
+              btnGoogle.textContent = `Image ${idx} - Google`;
+              btnGoogle.style.cssText = `
+                display: block !important;
+                width: 100% !important;
+                margin: 4px 0 8px 0 !important;
+                padding: 8px !important;
+                background: #34a853 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 4px !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+              `;
+              btnGoogle.onclick = () => reverseImageSearch(imgSrc, 'google');
+              imageLinksDiv.appendChild(btnGoogle);
+            }
+          });
+
+          document.body.appendChild(imageLinksDiv);
+        }
+      } else {
+        console.log('✗ Modal not found');
+      }
+
+      // Clean up the text - remove common FB UI elements
+      const lines = text.split('\n').filter(line => {
+        const cleaned = line.trim().toLowerCase();
+        // Filter out common Facebook UI text
+        return !cleaned.match(/^(like|comment|share|react|emoji|love|haha|wow|sad|angry|care|see more|show more|hide|report|edit|delete|loading|likes? comment|reactions|you|and \d+ others)/i);
+      });
+
+      text = lines.join('\n').trim();
+      console.log('Cleaned text length:', text.length);
+      console.log('Cleaned text preview:', text.substring(0, 300));
 
       return text.slice(0, 2000);
     } catch (e) {
@@ -96,6 +244,41 @@
     container.appendChild(overlay);
   }
 
+  function showClaudeResults(container, responseText) {
+    console.log('showClaudeResults called with text length:', responseText.length);
+    console.log('Container:', container);
+
+    removeOverlay(container);
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-overlay';
+    overlay.setAttribute('data-fc-overlay', 'true');
+    overlay.style.cssText = `
+      background: white !important;
+      border: 1px solid #e4e6eb !important;
+      border-radius: 8px !important;
+      margin: 8px 12px 12px 12px !important;
+      padding: 12px !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      font-size: 13px !important;
+      color: #050505 !important;
+      z-index: 1000 !important;
+    `;
+
+    overlay.innerHTML = `
+      <div class="fc-header">
+        <span class="fc-title">Claude Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close">✕</button>
+      </div>
+      <div class="fc-claude-response">
+        ${escapeHtml(responseText).replace(/\n/g, '<br>')}
+      </div>
+    `;
+
+    overlay.querySelector('.fc-close').addEventListener('click', () => removeOverlay(container));
+    container.appendChild(overlay);
+    console.log('Overlay appended, offsetHeight:', overlay.offsetHeight);
+  }
+
   function showError(container, message) {
     removeOverlay(container);
     const overlay = document.createElement('div');
@@ -110,38 +293,55 @@
     container.appendChild(overlay);
   }
 
-  async function handleFactCheck(container, btn) {
+  async function handleFactCheck(article, btn) {
+    console.log('handleFactCheck called');
     btn.disabled = true;
     btn.textContent = 'Checking…';
-    removeOverlay(container);
 
-    const text = extractPostText();
+    const text = await extractPostText(article);
     console.log('Post text:', text.length, 'chars');
 
     if (!text.trim()) {
-      showError(container, 'Could not extract text from post.');
+      showError(article, 'Could not extract text from post.');
       btn.disabled = false;
       btn.textContent = '🔍 Fact Check';
       return;
     }
 
     try {
-      const res = await fetch(`${BACKEND_URL}/fact-check`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
+      // Extract image URLs if present
+      const modal = document.querySelector('div[aria-modal="true"]');
+      const images = modal ? modal.querySelectorAll('img[data-imgperflogname="feedImage"]') : [];
+      const imageUrls = Array.from(images)
+        .map(img => img.src || img.getAttribute('data-src'))
+        .filter(url => url && url.length > 10);
 
-      if (!res.ok) {
-        const err = await res.json();
-        showError(container, err.detail || 'Backend error');
-      } else {
-        const data = await res.json();
-        showResults(container, data);
-      }
+      console.log('Sending fact-check request to background service worker');
+
+      // Send message to background service worker to handle Claude API call
+      chrome.runtime.sendMessage(
+        {
+          action: 'factCheckWithClaude',
+          text: text,
+          imageUrls: imageUrls
+        },
+        (response) => {
+          console.log('Response from background:', response);
+
+          if (response.error) {
+            showError(article, response.error);
+          } else if (response.result) {
+            console.log('Showing Claude results');
+            showClaudeResults(article, response.result);
+          }
+
+          btn.disabled = false;
+          btn.textContent = '🔍 Fact Check';
+        }
+      );
     } catch (e) {
-      showError(container, 'Cannot reach backend — is it running on port 8000?');
-    } finally {
+      console.error('Error:', e);
+      showError(article, `Error: ${e.message}`);
       btn.disabled = false;
       btn.textContent = '🔍 Fact Check';
     }
@@ -167,18 +367,14 @@
 
     console.log('✓ Article found:', article);
 
-    // Check if article is visible
-    const articleRect = article.getBoundingClientRect();
-    const articleStyles = getComputedStyle(article);
-    console.log('Article rect:', articleRect);
-    console.log('Article display:', articleStyles.display);
-    console.log('Article overflow:', articleStyles.overflow);
-    console.log('Article visibility:', articleStyles.visibility);
+    // Store reference to this article globally so click handler can use it
+    window._fcMainArticle = article;
 
     // Check if button already exists
-    const existingWrapper = article.querySelector('[data-fc-wrapper]');
+    const existingWrapper = document.querySelector('[data-fc-wrapper]');
     if (existingWrapper) {
-      console.log('Button already injected');
+      console.log('Button already exists, updating article reference');
+      window._fcMainArticle = article;
       return;
     }
 
@@ -207,55 +403,125 @@
       position: relative !important;
     `;
 
-    // Wrap button in a container with obvious styling
+    // Wrap button in a container - use fixed positioning to appear on top
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-fc-wrapper', 'true');
     wrapper.style.cssText = `
+      position: fixed !important;
+      top: 20px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
       background-color: #FFEEEE !important;
       border: 2px solid red !important;
       border-radius: 8px !important;
       padding: 12px !important;
-      margin: 12px 0 !important;
       text-align: center !important;
       display: block !important;
-      z-index: 10000 !important;
+      z-index: 999999 !important;
+      width: auto !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     `;
     wrapper.appendChild(btn);
 
-    const container = article.parentElement || article;
+    // When button is clicked, use the stored article reference
+    btn.addEventListener('click', () => {
+      console.log('Button clicked!');
+      const articleToCheck = window._fcMainArticle;
+      if (articleToCheck && articleToCheck.isConnected) {
+        console.log('Using stored article reference');
+        handleFactCheck(articleToCheck, btn);
+      } else {
+        console.log('Stored article reference stale, finding main article');
+        const allArticles = Array.from(document.querySelectorAll('[role="article"]'));
+        // The main post should be the one with the largest size
+        const mainArticle = allArticles.reduce((max, current) => {
+          const currentSize = current.offsetHeight * current.offsetWidth;
+          const maxSize = max.offsetHeight * max.offsetWidth;
+          return currentSize > maxSize ? current : max;
+        }, allArticles[0]);
 
-    btn.addEventListener('click', () => handleFactCheck(container, btn));
+        if (mainArticle) {
+          console.log('Found main article, size:', mainArticle.offsetHeight * mainArticle.offsetWidth);
+          window._fcMainArticle = mainArticle;
+          handleFactCheck(mainArticle, btn);
+        } else {
+          console.log('Could not find any article');
+          alert('Could not find post. Please refresh the page.');
+        }
+      }
+    });
 
-    // Insert button at the END of the article
-    article.appendChild(wrapper);
-    console.log('✓ Button wrapper appended to article');
-
-    // Check button visibility
-    setTimeout(() => {
-      const rect = btn.getBoundingClientRect();
-      console.log('Button rect:', rect);
-      console.log('Button offsetHeight:', btn.offsetHeight);
-      console.log('Button offsetWidth:', btn.offsetWidth);
-      console.log('Button computed display:', getComputedStyle(btn).display);
-      console.log('On screen?', rect.y >= 0 && rect.y < window.innerHeight);
-    }, 100);
+    // Append wrapper to body so it appears on top of everything
+    document.body.appendChild(wrapper);
+    console.log('✓ Button wrapper appended to body with fixed positioning');
   }
 
-  // Inject on initial load
-  setTimeout(injectButton, 500);
+  // Listen for messages from background script
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'factCheckText') {
+      const selectedText = request.text;
+      console.log('Fact-checking selected text:', selectedText.substring(0, 100));
 
-  // Re-inject periodically (in case React removes it)
-  setInterval(injectButton, 2000);
+      // Find modal or create a container for results
+      let modal = document.querySelector('div[aria-modal="true"]');
+      let container = modal;
 
-  // Also re-inject on URL changes
-  const originalPushState = window.history.pushState;
-  window.history.pushState = function(...args) {
-    originalPushState.apply(window.history, args);
-    setTimeout(injectButton, 500);
-    return;
-  };
+      if (!modal) {
+        // If no modal, use body as container
+        container = document.body;
+      }
 
-  window.addEventListener('popstate', () => {
-    setTimeout(injectButton, 500);
+      performFactCheck(selectedText, container);
+    }
   });
+
+  async function performFactCheck(text, container) {
+    // Create a status message
+    const statusDiv = document.createElement('div');
+    statusDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    `;
+    statusDiv.textContent = 'Fact-checking...';
+    document.body.appendChild(statusDiv);
+
+    try {
+      // Send to background service worker
+      console.log('Sending message to background service worker');
+      chrome.runtime.sendMessage(
+        {
+          action: 'factCheckWithClaude',
+          text: text,
+          imageUrls: []
+        },
+        (response) => {
+          console.log('Got response from background:', response);
+          statusDiv.remove();
+
+          if (!response) {
+            showError(container, 'No response from background service worker');
+            return;
+          }
+
+          if (response.error) {
+            showError(container, response.error);
+          } else if (response.result) {
+            showClaudeResults(container, response.result);
+          }
+        }
+      );
+    } catch (e) {
+      console.error('Error sending message:', e);
+      statusDiv.remove();
+      showError(container, `Error: ${e.message}`);
+    }
+  }
 })();

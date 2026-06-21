@@ -3,7 +3,7 @@
   "name": "Facebook Fact Checker",
   "version": "1.0",
   "description": "Adds a Fact Check button to Facebook feed posts for instant verification.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "contextMenus"],
   "host_permissions": [
     "https://www.facebook.com/*",
     "http://localhost:8000/*"

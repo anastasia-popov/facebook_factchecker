@@ -151,3 +151,13 @@
   color: #65676b;
   font-size: 13px;
 }
+
+.fc-claude-response {
+  max-height: 600px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #050505;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

@@ -1,25 +1,36 @@
 # Facebook Fact Checker Extension
 
-A Chrome extension that adds fact-checking capabilities to Facebook. Click a "Fact Check" button on any post to extract claims and verify them against existing fact-checks.
+A Chrome extension that adds fact-checking capabilities to Facebook. Select text on Facebook, right-click, and choose "Fact Check Selection" to analyze claims with Claude.
 
 ## How It Works
 
-1. **Claim Extraction**: Uses ClaimBuster API to identify check-worthy claims from post text
-2. **Verification**: Queries Google Fact Check Tools API to find existing fact-checks for those claims
-3. **Results Display**: Shows verdict badges and source links inline on the post
+1. **Text Selection**: Select any text on Facebook (posts, comments, etc.)
+2. **Context Menu**: Right-click and choose "🔍 Fact Check Selection"
+3. **Claude Analysis**: Sends text to Claude API for comprehensive fact-checking
+4. **Results Display**: Shows analysis with key claims, verdicts, and recommendations
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.8+
 - Chrome browser
-- API keys (free tier available):
-  - **Google Fact Check Tools API** (required): Get free key at https://console.developers.google.com/
-  - **ClaimBuster API** (optional): Get free key at https://idir.uta.edu/claimbuster/
-    - If not provided, the backend uses simple sentence splitting instead
+- Claude API key: Get it from https://console.anthropic.com/
 
-### Backend Setup
+### Extension Setup
+
+1. **Load extension in Chrome**:
+   - Go to `chrome://extensions`
+   - Enable "Developer mode" (top right)
+   - Click "Load unpacked"
+   - Select the `extension/` folder from this project
+
+2. **Verify the extension is loaded**:
+   - The "Facebook Fact Checker" should appear in your extensions
+   - You should see the extension icon in the Chrome toolbar
+
+### Backend Setup (Required for Claude-based fact checking)
+
+The extension uses a Python FastAPI backend for web search and Claude-based fact-checking.
 
 1. **Install dependencies**:
    ```bash
@@ -30,7 +41,9 @@ A Chrome extension that adds fact-checking capabilities to Facebook. Click a "Fa
 2. **Set up environment variables**:
    ```bash
    cp .env.example .env
-   # Edit .env and add your API keys
+   # Edit .env and add your API keys:
+   # - CLAUDE_API_KEY: Get from https://console.anthropic.com/
+   # - SERPER_API_KEY: Get from https://serper.dev/ (free tier available)
    ```
 
 3. **Start the server**:
@@ -38,6 +51,8 @@ A Chrome extension that adds fact-checking capabilities to Facebook. Click a "Fa
    uvicorn main:app --reload --port 8000
    ```
    The backend will run at `http://localhost:8000`
+
+**Note:** The backend must be running on port 8000 for the extension to work.
 
 ### Extension Setup
 
@@ -54,14 +69,14 @@ A Chrome extension that adds fact-checking capabilities to Facebook. Click a "Fa
 
 ## Usage
 
-1. Visit `facebook.com` and scroll through your feed
-2. Locate a post with factual claims
-3. Click the **🔍 Fact Check** button at the bottom of the post
-4. Wait for results (usually 2-5 seconds)
-5. Results appear as an overlay with:
-   - Each extracted claim
-   - Verdict (True, False, Mixture, or Unverified)
-   - Source links to fact-check articles
+1. **On Facebook**, select the text you want to fact-check
+2. **Right-click** on the selected text
+3. **Choose "🔍 Fact Check Selection"** from the context menu
+4. **Wait for results** (usually 3-5 seconds)
+5. **Results appear as an overlay** with Claude's analysis:
+   - Key claims identified
+   - Fact-check status for each claim (True/False/Misleading/Unverified)
+   - Overall assessment and recommendations
 
 ## Architecture
 

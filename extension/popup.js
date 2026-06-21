@@ -1,37 +1,39 @@
-async function checkBackendHealth() {
+async function checkApiKey() {
   const indicator = document.getElementById('statusIndicator');
   const statusText = document.getElementById('statusText');
+  const apiKey = document.getElementById('claudeApiKey').value;
 
-  try {
-    const backendUrl = document.getElementById('backendUrl').value || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/health`);
-    if (response.ok) {
-      indicator.className = 'status-indicator ok';
-      statusText.textContent = 'Backend is running ✓';
-    } else {
-      indicator.className = 'status-indicator error';
-      statusText.textContent = 'Backend returned an error';
-    }
-  } catch (e) {
+  if (apiKey && apiKey.startsWith('sk-ant-')) {
+    indicator.className = 'status-indicator ok';
+    statusText.textContent = 'Claude API key configured ✓';
+  } else if (apiKey) {
     indicator.className = 'status-indicator error';
-    statusText.textContent = 'Backend is not running';
+    statusText.textContent = 'Invalid API key format';
+  } else {
+    indicator.className = 'status-indicator error';
+    statusText.textContent = 'API key not set';
   }
 }
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
-  const url = document.getElementById('backendUrl').value || 'http://localhost:8000';
-  await chrome.storage.local.set({ backendUrl: url });
+  const apiKey = document.getElementById('claudeApiKey').value;
+  await chrome.storage.local.set({ claudeApiKey: apiKey });
+  await checkApiKey();
   const btn = document.getElementById('saveBtn');
   btn.textContent = 'Saved!';
   setTimeout(() => {
-    btn.textContent = 'Save';
+    btn.textContent = 'Save Settings';
   }, 1500);
 });
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get(['backendUrl']);
-  document.getElementById('backendUrl').value = data.backendUrl || 'http://localhost:8000';
-  checkBackendHealth();
+  const data = await chrome.storage.local.get(['claudeApiKey']);
+  const apiKey = data.claudeApiKey || '';
+  // Show masked version
+  if (apiKey) {
+    document.getElementById('claudeApiKey').value = apiKey.substring(0, 10) + '...' + apiKey.substring(apiKey.length - 4);
+  }
+  await checkApiKey();
 }
 
 loadSettings();

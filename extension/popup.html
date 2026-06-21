@@ -87,11 +87,14 @@
       color: #065fd4;
     }
     a {
-      color: #1877f2;
+      color: #065fd4;
       text-decoration: none;
     }
     a:hover {
       text-decoration: underline;
+    }
+    input[type="password"] {
+      font-family: monospace;
     }
   </style>
 </head>
@@ -104,16 +107,16 @@
   </div>
 
   <div class="form-group">
-    <label for="backendUrl">Backend URL</label>
-    <input type="text" id="backendUrl" placeholder="http://localhost:8000">
+    <label for="claudeApiKey">Claude API Key</label>
+    <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
   </div>
 
-  <button id="saveBtn">Save</button>
+  <button id="saveBtn">Save Settings</button>
 
   <div class="info-text">
     To get started:<br>
-    1. Set up API keys in the backend<br>
-    2. Run <code>uvicorn main:app</code> in the backend folder<br>
+    1. Get Claude API key from <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a><br>
+    2. Paste it above<br>
     3. Visit Facebook and click "Fact Check" on any post
   </div>
 </body>

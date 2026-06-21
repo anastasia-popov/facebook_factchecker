@@ -1,8 +1,9 @@
 import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from models import FactCheckRequest, FactCheckResponse
+from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
+from claude_checker import fact_check_with_claude
 from config import settings
 
 logging.basicConfig(level=logging.DEBUG)
@@ -41,4 +42,23 @@ async def fact_check(req: FactCheckRequest):
         return result
     except Exception as e:
         logger.error(f"Error in fact_check: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/claude-fact-check", response_model=ClaudeFactCheckResponse)
+async def claude_fact_check(req: FactCheckRequest):
+    if not settings.claude_api_key:
+        raise HTTPException(status_code=503, detail="CLAUDE_API_KEY not configured")
+    if not settings.serper_api_key:
+        raise HTTPException(status_code=503, detail="SERPER_API_KEY not configured")
+    try:
+        logger.debug(f"Processing text with Claude: {req.text[:100]}...")
+        analysis = await fact_check_with_claude(req.text)
+        logger.debug(f"Claude analysis complete (length: {len(analysis)})")
+        return ClaudeFactCheckResponse(
+            analysis=analysis,
+            post_text_preview=req.text[:100]
+        )
+    except Exception as e:
+        logger.error(f"Error in claude_fact_check: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=str(e))

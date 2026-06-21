@@ -30,3 +30,8 @@ class ClaimResult(BaseModel):
 class FactCheckResponse(BaseModel):
     claims: list[ClaimResult]
     post_text_preview: str
+
+
+class ClaudeFactCheckResponse(BaseModel):
+    analysis: str
+    post_text_preview: str
