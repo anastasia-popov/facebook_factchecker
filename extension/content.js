@@ -245,22 +245,34 @@
   }
 
   function parseTextWithLinks(text) {
+    if (!text || typeof text !== 'string') {
+      console.error('parseTextWithLinks received invalid text:', text);
+      return escapeHtml(String(text));
+    }
+
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
 
     return parts.map((part, idx) => {
-      if (part.match(urlRegex)) {
+      if (part && part.match(urlRegex)) {
         // Remove trailing punctuation if present
         const cleanUrl = part.replace(/[.,;:!?)]$/, '');
         return `<a href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener noreferrer" style="color: #1877f2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
       }
-      return escapeHtml(part);
+      return part ? escapeHtml(part) : '';
     }).join('');
   }
 
   function showClaudeResults(container, responseText) {
-    console.log('showClaudeResults called with text length:', responseText.length);
+    console.log('showClaudeResults called with text length:', responseText?.length);
+    console.log('Response text preview:', responseText?.substring(0, 100));
     console.log('Container:', container);
+
+    if (!responseText || responseText.trim() === '') {
+      console.error('Empty response text received');
+      showError(container, 'Received empty analysis from backend');
+      return;
+    }
 
     removeOverlay(container);
     const overlay = document.createElement('div');
@@ -284,19 +296,21 @@
       .replace(/^##\s+(.+)$/gm, '<h3 style="margin: 12px 0 6px 0 !important; font-size: 15px !important; font-weight: 600 !important;">$1</h3>')
       .replace(/^\*\*(.+?)\*\*:/gm, '<strong style="color: #1877f2 !important;">$1:</strong>');
 
+    console.log('Formatted HTML length:', responseHtml.length);
+
     overlay.innerHTML = `
-      <div class="fc-header">
-        <span class="fc-title">Claude Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; margin-bottom: 8px !important;">
+        <span class="fc-title" style="font-weight: 600 !important;">Claude Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important;">✕</button>
       </div>
-      <div class="fc-claude-response" style="max-height: 400px !important; overflow-y: auto !important; padding-right: 8px !important;">
+      <div class="fc-claude-response" style="max-height: 400px !important; overflow-y: auto !important; padding-right: 8px !important; white-space: normal !important; word-wrap: break-word !important;">
         ${responseHtml}
       </div>
     `;
 
     overlay.querySelector('.fc-close').addEventListener('click', () => removeOverlay(container));
     container.appendChild(overlay);
-    console.log('Overlay appended, offsetHeight:', overlay.offsetHeight);
+    console.log('Overlay appended successfully');
   }
 
   function showError(container, message) {

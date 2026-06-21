@@ -55,10 +55,18 @@ async def claude_fact_check(req: FactCheckRequest):
         logger.debug(f"Processing text with Claude: {req.text[:100]}...")
         analysis = await fact_check_with_claude(req.text)
         logger.debug(f"Claude analysis complete (length: {len(analysis)})")
-        return ClaudeFactCheckResponse(
+        logger.debug(f"Analysis preview: {analysis[:200]}...")
+
+        if not analysis or len(analysis.strip()) == 0:
+            logger.error("Claude returned empty analysis")
+            raise Exception("Claude returned empty analysis")
+
+        response = ClaudeFactCheckResponse(
             analysis=analysis,
             post_text_preview=req.text[:100]
         )
+        logger.info(f"Returning response with analysis length: {len(response.analysis)}")
+        return response
     except Exception as e:
         logger.error(f"Error in claude_fact_check: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=str(e))
