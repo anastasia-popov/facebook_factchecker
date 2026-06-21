@@ -266,7 +266,6 @@
   function showClaudeResults(container, responseText) {
     console.log('showClaudeResults called with text length:', responseText?.length);
     console.log('Response text preview:', responseText?.substring(0, 100));
-    console.log('Container:', container);
 
     if (!responseText || responseText.trim() === '') {
       console.error('Empty response text received');
@@ -274,21 +273,29 @@
       return;
     }
 
-    removeOverlay(container);
+    // Create overlay as fixed position on body so it doesn't disappear with modal
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay';
     overlay.setAttribute('data-fc-overlay', 'true');
     overlay.style.cssText = `
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
       background: white !important;
       border: 1px solid #e4e6eb !important;
       border-radius: 8px !important;
-      margin: 8px 12px 12px 12px !important;
-      padding: 12px !important;
+      padding: 16px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
       color: #050505 !important;
-      z-index: 1000 !important;
+      z-index: 999999 !important;
       line-height: 1.5 !important;
+      width: 90% !important;
+      max-width: 600px !important;
+      max-height: 80vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     `;
 
     const responseHtml = parseTextWithLinks(responseText)
@@ -299,32 +306,55 @@
     console.log('Formatted HTML length:', responseHtml.length);
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; margin-bottom: 8px !important;">
-        <span class="fc-title" style="font-weight: 600 !important;">Claude Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important;">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; margin-bottom: 12px !important; padding-bottom: 8px !important; border-bottom: 1px solid #e4e6eb !important;">
+        <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Claude Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important;">✕</button>
       </div>
-      <div class="fc-claude-response" style="max-height: 400px !important; overflow-y: auto !important; padding-right: 8px !important; white-space: normal !important; word-wrap: break-word !important;">
+      <div class="fc-claude-response" style="white-space: normal !important; word-wrap: break-word !important; padding-right: 4px !important;">
         ${responseHtml}
       </div>
     `;
 
-    overlay.querySelector('.fc-close').addEventListener('click', () => removeOverlay(container));
-    container.appendChild(overlay);
-    console.log('Overlay appended successfully');
+    const closeBtn = overlay.querySelector('.fc-close');
+    closeBtn.addEventListener('click', () => {
+      console.log('Closing overlay');
+      overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+    console.log('Overlay appended to body with fixed positioning');
   }
 
   function showError(container, message) {
-    removeOverlay(container);
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay fc-overlay-error';
     overlay.setAttribute('data-fc-overlay', 'true');
-    overlay.innerHTML = `
-      <span class="fc-error-icon">⚠️</span>
-      <span>${escapeHtml(message)}</span>
-      <button class="fc-close" aria-label="Close">✕</button>
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      background: #fff3cd !important;
+      border: 1px solid #ffc107 !important;
+      border-radius: 8px !important;
+      padding: 16px !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      font-size: 13px !important;
+      color: #856404 !important;
+      z-index: 999999 !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      max-width: 400px !important;
+      display: flex !important;
+      gap: 8px !important;
+      align-items: flex-start !important;
     `;
-    overlay.querySelector('.fc-close').addEventListener('click', () => removeOverlay(container));
-    container.appendChild(overlay);
+    overlay.innerHTML = `
+      <span class="fc-error-icon" style="font-size: 20px !important; flex-shrink: 0 !important;">⚠️</span>
+      <span style="flex: 1 !important;">${escapeHtml(message)}</span>
+      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #856404 !important; padding: 0 !important;">✕</button>
+    `;
+    overlay.querySelector('.fc-close').addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
   }
 
   async function handleFactCheck(article, btn) {
