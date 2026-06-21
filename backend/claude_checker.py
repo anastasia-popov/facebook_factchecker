@@ -134,8 +134,8 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
         # Message history for multi-turn interaction
         messages = [{"role": "user", "content": prompt}]
 
-        # Tool use loop
-        max_iterations = 3
+        # Tool use loop - continue until we get full analysis, not just introduction
+        max_iterations = 5
         for iteration in range(max_iterations):
             logger.debug(f"Claude iteration {iteration + 1}/{max_iterations}")
 
@@ -168,11 +168,13 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                 # Check if Claude wants to use tools
                 has_tool_use = False
                 has_text = False
+                text_content = ""
                 tool_results = []
 
                 for content_block in data["content"]:
                     if content_block.get("type") == "text":
                         has_text = True
+                        text_content = content_block.get("text", "")
                     elif content_block.get("type") == "tool_use":
                         has_tool_use = True
                         tool_name = content_block.get("name")
@@ -197,17 +199,32 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                                 "content": result_text
                             })
 
+                # Determine if we should continue or stop
+                is_introductory = has_text and (
+                    "will research" in text_content.lower() or
+                    "will search" in text_content.lower() or
+                    "let me search" in text_content.lower() or
+                    len(text_content) < 200  # Very short response likely intro
+                )
+
                 # If Claude used tools, send results back and continue
                 if has_tool_use and tool_results:
                     logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
                     messages.append({"role": "user", "content": tool_results})
                     # Continue the loop to get Claude's next response
-                elif has_text:
-                    # Claude provided text without requesting tools - we have the analysis
-                    logger.debug("Claude provided final analysis without more tools, stopping iteration")
+                elif has_text and not is_introductory:
+                    # Claude provided substantial text (not just intro) without requesting tools
+                    logger.debug(f"Claude provided final analysis ({len(text_content)} chars), stopping iteration")
                     break
+                elif has_text and is_introductory:
+                    # Claude provided intro text, force it to do actual analysis
+                    logger.debug("Claude provided introductory text, requesting full analysis")
+                    messages.append({
+                        "role": "user",
+                        "content": "Please proceed with the actual fact-checking analysis now. Identify each claim, provide verdicts, and cite sources."
+                    })
                 else:
-                    # Claude finished without providing text or tools - ask for analysis
+                    # Claude finished without providing text - ask for analysis
                     logger.debug("Claude finished without text or tools, requesting final analysis")
                     messages.append({
                         "role": "user",
