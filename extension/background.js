@@ -1,26 +1,53 @@
 console.log('Background script loaded');
 
+// Function to create context menus
+function setupContextMenus() {
+  console.log('Setting up context menus');
+
+  // Remove existing menus to avoid duplicates
+  chrome.contextMenus.removeAll(() => {
+    // Create context menu for text fact-checking
+    chrome.contextMenus.create({
+      id: 'factcheck-selection',
+      title: '🔍 Fact Check Selection',
+      contexts: ['selection']
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Error creating text menu:', chrome.runtime.lastError);
+      } else {
+        console.log('✓ Text context menu created');
+      }
+    });
+
+    // Create context menu for image OCR fact-checking
+    chrome.contextMenus.create({
+      id: 'factcheck-image',
+      title: '🔍 Extract & Fact Check Image Text',
+      contexts: ['image']
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Error creating image menu:', chrome.runtime.lastError);
+      } else {
+        console.log('✓ Image context menu created');
+      }
+    });
+  });
+}
+
+// Setup menus on install
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed/updated');
   chrome.storage.local.set({ claudeApiKey: '' });
-
-  // Create context menu for text fact-checking
-  chrome.contextMenus.create({
-    id: 'factcheck-selection',
-    title: '🔍 Fact Check Selection',
-    contexts: ['selection']
-  });
-
-  // Create context menu for image OCR fact-checking
-  chrome.contextMenus.create({
-    id: 'factcheck-image',
-    title: '🔍 Extract & Fact Check Image Text',
-    contexts: ['image']
-  });
+  setupContextMenus();
 });
+
+// Also setup menus on startup (in case they were removed)
+setupContextMenus();
 
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  console.log('Context menu clicked:', info.menuItemId, 'srcUrl:', info.srcUrl);
+
   if (info.menuItemId === 'factcheck-selection' && info.selectionText) {
     // Send selected text to content script
     console.log('User selected text for fact-checking');
@@ -28,14 +55,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       action: 'factCheckText',
       text: info.selectionText
     });
-  } else if (info.menuItemId === 'factcheck-image' && info.srcUrl) {
-    // Send image URL to content script for OCR
-    console.log('User selected image for OCR fact-checking, URL:', info.srcUrl);
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'factCheckImage',
-      imageUrl: info.srcUrl,
-      frameId: info.frameId
-    });
+  } else if (info.menuItemId === 'factcheck-image') {
+    if (!info.srcUrl) {
+      console.warn('No srcUrl found, trying to capture from page');
+      // Try to get image from the page if context menu doesn't provide URL
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'findImageForOCR'
+      });
+    } else {
+      // Send image URL to content script for OCR
+      console.log('User selected image for OCR fact-checking, URL:', info.srcUrl);
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'factCheckImage',
+        imageUrl: info.srcUrl,
+        frameId: info.frameId
+      });
+    }
   }
 });
 
