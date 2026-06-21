@@ -279,22 +279,23 @@
     overlay.setAttribute('data-fc-overlay', 'true');
     overlay.style.cssText = `
       position: fixed !important;
-      top: 50% !important;
+      top: 20px !important;
       left: 50% !important;
-      transform: translate(-50%, -50%) !important;
+      transform: translateX(-50%) !important;
       background: white !important;
       border: 1px solid #e4e6eb !important;
       border-radius: 8px !important;
-      padding: 16px !important;
+      padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
       color: #050505 !important;
       z-index: 999999 !important;
       line-height: 1.5 !important;
       width: 90% !important;
-      max-width: 600px !important;
-      max-height: 80vh !important;
-      overflow-y: auto !important;
+      max-width: 700px !important;
+      max-height: calc(100vh - 40px) !important;
+      display: flex !important;
+      flex-direction: column !important;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     `;
 
@@ -306,11 +307,11 @@
     console.log('Formatted HTML length:', responseHtml.length);
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; margin-bottom: 12px !important; padding-bottom: 8px !important; border-bottom: 1px solid #e4e6eb !important;">
-        <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Claude Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important;">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 12px 16px !important; border-bottom: 1px solid #e4e6eb !important; flex-shrink: 0 !important; background: #fafbfc !important;">
+        <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important;">✕</button>
       </div>
-      <div class="fc-claude-response" style="white-space: normal !important; word-wrap: break-word !important; padding-right: 4px !important;">
+      <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 16px !important; white-space: normal !important; word-wrap: break-word !important;">
         ${responseHtml}
       </div>
     `;

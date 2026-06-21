@@ -244,12 +244,6 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                 logger.error(f"Message {i}: {msg}")
             raise Exception("Claude did not return text analysis")
 
-        # Truncate response if too long to keep UI responsive
-        max_response_length = 3000
-        if len(final_response) > max_response_length:
-            final_response = final_response[:max_response_length].rstrip() + "\n\n[Analysis truncated for display. Full analysis available on backend.]"
-            logger.debug(f"Truncated response from {len(final_response)} to {max_response_length} chars")
-
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response
 
