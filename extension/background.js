@@ -30,10 +30,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     });
   } else if (info.menuItemId === 'factcheck-image' && info.srcUrl) {
     // Send image URL to content script for OCR
-    console.log('User selected image for OCR fact-checking');
+    console.log('User selected image for OCR fact-checking, URL:', info.srcUrl);
     chrome.tabs.sendMessage(tab.id, {
       action: 'factCheckImage',
-      imageUrl: info.srcUrl
+      imageUrl: info.srcUrl,
+      frameId: info.frameId
     });
   }
 });

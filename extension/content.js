@@ -22,6 +22,8 @@
   async function performOCR(imageUrl) {
     console.log('Starting OCR on image:', imageUrl);
 
+    let statusDiv;
+
     try {
       // Load Tesseract if not already loaded
       if (!window.Tesseract) {
@@ -31,7 +33,7 @@
       const { Tesseract } = window;
 
       // Show status
-      const statusDiv = document.createElement('div');
+      statusDiv = document.createElement('div');
       statusDiv.style.cssText = `
         position: fixed;
         top: 50%;
@@ -47,25 +49,75 @@
       statusDiv.textContent = 'Extracting text from image...';
       document.body.appendChild(statusDiv);
 
-      // Fetch the image and convert to blob
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
+      let blob;
+
+      // Try method 1: Direct fetch
+      try {
+        console.log('Attempting direct fetch...');
+        const response = await fetch(imageUrl);
+        blob = await response.blob();
+        console.log('Direct fetch successful');
+      } catch (e) {
+        console.log('Direct fetch failed, trying alternative methods...');
+
+        // Try method 2: Find and use img element from DOM (works for Instagram/Facebook)
+        try {
+          console.log('Attempting to find image element in DOM...');
+          const imgElements = Array.from(document.querySelectorAll('img'));
+          const matchedImg = imgElements.find(img => {
+            const src = img.src || img.getAttribute('data-src');
+            return src && src.includes(imageUrl.split('/').pop().split('?')[0]);
+          });
+
+          if (matchedImg) {
+            console.log('Found image element in DOM');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = matchedImg.naturalWidth || matchedImg.width;
+            canvas.height = matchedImg.naturalHeight || matchedImg.height;
+            ctx.drawImage(matchedImg, 0, 0);
+            blob = await new Promise(resolve => canvas.toBlob(resolve));
+            console.log('Converted image element to blob');
+          } else {
+            throw new Error('Could not find image in DOM');
+          }
+        } catch (e2) {
+          console.log('DOM method failed, trying fetch with no-cors...');
+          try {
+            const response = await fetch(imageUrl, { mode: 'no-cors' });
+            blob = await response.blob();
+            console.log('Fetch with no-cors successful');
+          } catch (e3) {
+            throw new Error('Unable to access image. It may be CORS-protected. Try right-clicking directly on the image.');
+          }
+        }
+      }
 
       // Create worker and perform OCR
+      statusDiv.textContent = 'Processing image with OCR...';
       const worker = await Tesseract.createWorker();
       const result = await worker.recognize(blob);
       const extractedText = result.data.text;
 
       await worker.terminate();
-      statusDiv.remove();
+
+      if (statusDiv && statusDiv.parentNode) {
+        statusDiv.remove();
+      }
 
       console.log('OCR complete, extracted text length:', extractedText.length);
       console.log('Extracted text preview:', extractedText.substring(0, 100));
 
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error('No text found in the image');
+      }
+
       return extractedText;
     } catch (error) {
       console.error('OCR error:', error);
-      statusDiv.remove();
+      if (statusDiv && statusDiv.parentNode) {
+        statusDiv.remove();
+      }
       throw error;
     }
   }
