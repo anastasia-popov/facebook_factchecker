@@ -197,12 +197,30 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
                     # Claude finished without needing more tools
                     break
 
-        # Extract final text response
+        # Extract final text response - search backwards through messages for latest assistant text
+        logger.debug(f"Messages length: {len(messages)}")
+
         final_response = ""
-        for content_block in messages[-1]["content"]:
-            if content_block.get("type") == "text":
-                final_response = content_block.get("text", "")
-                break
+        # Search from the end of messages backwards to find the last text response
+        for i in range(len(messages) - 1, -1, -1):
+            msg = messages[i]
+            logger.debug(f"Checking message {i}, role: {msg.get('role')}")
+            if msg.get("role") == "assistant":
+                content = msg.get("content", [])
+                for content_block in content:
+                    logger.debug(f"Content block type: {content_block.get('type')}")
+                    if content_block.get("type") == "text":
+                        final_response = content_block.get("text", "")
+                        logger.debug(f"Found text block: {final_response[:100]}...")
+                        break
+                if final_response:
+                    break
+
+        if not final_response:
+            logger.error("No text response found in Claude messages")
+            for i, msg in enumerate(messages):
+                logger.error(f"Message {i}: {msg}")
+            raise Exception("Claude did not return text analysis")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response
