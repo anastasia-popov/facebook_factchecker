@@ -2,22 +2,6 @@
   const BACKEND_URL = 'http://localhost:8000';
   console.log('🔍 Fact Checker: Content script loaded');
 
-  // Load Tesseract.js for OCR
-  function loadTesseract() {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
-      script.onload = () => {
-        console.log('Tesseract.js loaded');
-        resolve();
-      };
-      script.onerror = () => {
-        console.error('Failed to load Tesseract.js');
-        reject(new Error('Failed to load OCR library'));
-      };
-      document.head.appendChild(script);
-    });
-  }
 
   async function performOCR(imageUrl) {
     console.log('Starting OCR on image:', imageUrl);
@@ -25,13 +9,6 @@
     let statusDiv;
 
     try {
-      // Load Tesseract if not already loaded
-      if (!window.Tesseract) {
-        await loadTesseract();
-      }
-
-      const { Tesseract } = window;
-
       // Show status
       statusDiv = document.createElement('div');
       statusDiv.style.cssText = `
@@ -46,60 +23,38 @@
         z-index: 999999;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       `;
-      statusDiv.textContent = 'Extracting text from image...';
+      statusDiv.textContent = 'Downloading image...';
       document.body.appendChild(statusDiv);
 
-      let blob;
-
-      // Try method 1: Direct fetch
+      // Fetch the image
+      let imageBlob;
       try {
-        console.log('Attempting direct fetch...');
         const response = await fetch(imageUrl);
-        blob = await response.blob();
-        console.log('Direct fetch successful');
+        imageBlob = await response.blob();
+        console.log('Image downloaded, size:', imageBlob.size);
       } catch (e) {
-        console.log('Direct fetch failed, trying alternative methods...');
-
-        // Try method 2: Find and use img element from DOM (works for Instagram/Facebook)
-        try {
-          console.log('Attempting to find image element in DOM...');
-          const imgElements = Array.from(document.querySelectorAll('img'));
-          const matchedImg = imgElements.find(img => {
-            const src = img.src || img.getAttribute('data-src');
-            return src && src.includes(imageUrl.split('/').pop().split('?')[0]);
-          });
-
-          if (matchedImg) {
-            console.log('Found image element in DOM');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = matchedImg.naturalWidth || matchedImg.width;
-            canvas.height = matchedImg.naturalHeight || matchedImg.height;
-            ctx.drawImage(matchedImg, 0, 0);
-            blob = await new Promise(resolve => canvas.toBlob(resolve));
-            console.log('Converted image element to blob');
-          } else {
-            throw new Error('Could not find image in DOM');
-          }
-        } catch (e2) {
-          console.log('DOM method failed, trying fetch with no-cors...');
-          try {
-            const response = await fetch(imageUrl, { mode: 'no-cors' });
-            blob = await response.blob();
-            console.log('Fetch with no-cors successful');
-          } catch (e3) {
-            throw new Error('Unable to access image. It may be CORS-protected. Try right-clicking directly on the image.');
-          }
-        }
+        console.log('Direct fetch failed, trying with no-cors...');
+        const response = await fetch(imageUrl, { mode: 'no-cors' });
+        imageBlob = await response.blob();
       }
 
-      // Create worker and perform OCR
-      statusDiv.textContent = 'Processing image with OCR...';
-      const worker = await Tesseract.createWorker();
-      const result = await worker.recognize(blob);
-      const extractedText = result.data.text;
+      // Upload to backend for OCR
+      statusDiv.textContent = 'Extracting text from image (backend OCR)...';
+      const formData = new FormData();
+      formData.append('file', imageBlob, 'image.png');
 
-      await worker.terminate();
+      const ocrResponse = await fetch(`${BACKEND_URL}/ocr`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!ocrResponse.ok) {
+        const error = await ocrResponse.json();
+        throw new Error(`OCR Error: ${error.detail || 'Unknown error'}`);
+      }
+
+      const ocrResult = await ocrResponse.json();
+      const extractedText = ocrResult.text;
 
       if (statusDiv && statusDiv.parentNode) {
         statusDiv.remove();

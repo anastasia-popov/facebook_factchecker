@@ -1,10 +1,14 @@
 import logging
-from fastapi import FastAPI, HTTPException
+import io
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
 from claude_checker import fact_check_with_claude
 from config import settings
+import httpx
+from PIL import Image
+import pytesseract
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -69,4 +73,33 @@ async def claude_fact_check(req: FactCheckRequest):
         return response
     except Exception as e:
         logger.error(f"Error in claude_fact_check: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/ocr")
+async def extract_text_from_image(file: UploadFile = File(...)):
+    """Extract text from an image using OCR (Tesseract)"""
+    try:
+        logger.debug(f"Extracting text from image: {file.filename}")
+
+        # Read the uploaded image
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+
+        # Extract text using Tesseract
+        extracted_text = pytesseract.image_to_string(image)
+
+        if not extracted_text or len(extracted_text.strip()) == 0:
+            logger.warning("OCR returned empty text")
+            raise Exception("No text found in the image")
+
+        logger.debug(f"OCR complete, extracted {len(extracted_text)} characters")
+        logger.debug(f"Text preview: {extracted_text[:100]}...")
+
+        return {
+            "text": extracted_text,
+            "length": len(extracted_text)
+        }
+    except Exception as e:
+        logger.error(f"Error in OCR: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=str(e))
