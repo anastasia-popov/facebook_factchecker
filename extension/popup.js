@@ -55,41 +55,6 @@ async function loadSettings() {
   await checkSettings();
 }
 
-// Handle screenshot OCR button
-document.getElementById('screenshotBtn').addEventListener('click', async () => {
-  console.log('Screenshot button clicked');
-
-  try {
-    // Get the active tab
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const tab = tabs[0];
-
-    if (!tab || !tab.id) {
-      alert('Error: Could not find active tab');
-      return;
-    }
-
-    console.log('Sending screenshot activation message to tab:', tab.id);
-
-    // Send message to content script to activate screenshot mode
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'activateScreenshot'
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Message error:', chrome.runtime.lastError);
-        alert('Error: ' + chrome.runtime.lastError.message + '\n\nTry refreshing the page first.');
-      } else {
-        console.log('Screenshot mode activated successfully');
-        // Close popup after sending
-        setTimeout(() => window.close(), 500);
-      }
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Error: ' + error.message);
-  }
-});
-
 // Handle clipboard paste for images
 let clipboardImage = null;
 document.getElementById('imageUrl').addEventListener('paste', async (e) => {
