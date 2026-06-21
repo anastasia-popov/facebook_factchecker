@@ -2,6 +2,148 @@
   const BACKEND_URL = 'http://localhost:8000';
   console.log('🔍 Fact Checker: Content script loaded');
 
+  // Screenshot/rectangle selection mode
+  let screenshotMode = false;
+  let startX, startY;
+  let selectionBox = null;
+
+  function enterScreenshotMode() {
+    screenshotMode = true;
+    console.log('Screenshot mode activated - drag to select area');
+
+    // Create overlay for screenshot mode
+    const overlay = document.createElement('div');
+    overlay.id = 'fc-screenshot-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      cursor: crosshair;
+      z-index: 99998;
+    `;
+
+    // Create instruction text
+    const instruction = document.createElement('div');
+    instruction.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      z-index: 99999;
+      font-size: 14px;
+      font-weight: 600;
+    `;
+    instruction.textContent = 'Drag to select area for OCR • Press Esc to cancel';
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(instruction);
+
+    overlay.addEventListener('mousedown', (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
+
+      selectionBox = document.createElement('div');
+      selectionBox.style.cssText = `
+        position: fixed;
+        border: 2px solid #1877f2;
+        background: rgba(24, 119, 242, 0.1);
+        z-index: 99999;
+        pointer-events: none;
+      `;
+      document.body.appendChild(selectionBox);
+
+      const handleMouseMove = (e) => {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        const left = Math.min(startX, currentX);
+        const top = Math.min(startY, currentY);
+
+        selectionBox.style.left = left + 'px';
+        selectionBox.style.top = top + 'px';
+        selectionBox.style.width = width + 'px';
+        selectionBox.style.height = height + 'px';
+      };
+
+      const handleMouseUp = async (e) => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+
+        overlay.remove();
+        instruction.remove();
+
+        if (selectionBox) {
+          selectionBox.remove();
+        }
+
+        // Capture the selected area
+        const width = Math.abs(e.clientX - startX);
+        const height = Math.abs(e.clientY - startY);
+
+        if (width < 50 || height < 50) {
+          showError(document.body, 'Selection area too small. Please select a larger area.');
+          screenshotMode = false;
+          return;
+        }
+
+        const left = Math.min(startX, e.clientX);
+        const top = Math.min(startY, e.clientY);
+
+        console.log(`Capturing area: ${width}x${height} at (${left}, ${top})`);
+        captureArea(left, top, width, height);
+        screenshotMode = false;
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+
+    // Cancel on Escape
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        screenshotMode = false;
+        overlay.remove();
+        instruction.remove();
+        if (selectionBox) selectionBox.remove();
+        document.removeEventListener('keydown', handleEscape);
+        console.log('Screenshot mode cancelled');
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+  }
+
+  async function captureArea(x, y, width, height) {
+    console.log('Screenshot area selected:', width, 'x', height, 'at', x, ',', y);
+
+    // Use browser's native screenshot API if available
+    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+      showError(document.body, `Screenshot area selected! Now:\n\n1. Press Print Screen or use your OS screenshot tool\n2. Crop to the area you selected\n3. Paste the screenshot in the extension popup's "Manual OCR" field\n4. Click "Extract Text & Fact-Check"\n\nAlternatively, right-click the image and copy its address, then paste in the popup.`);
+      return;
+    }
+
+    // Fallback: guide user to manual process
+    const message = `You selected an area with text!\n\nTo OCR it:\n1. Take a screenshot of this area (Print Screen)\n2. In the extension popup, paste the image URL or screenshot\n3. Click "Extract Text & Fact-Check"\n\nOr copy an image link and paste it directly.`;
+
+    showError(document.body, message);
+  }
+
+  // Keyboard shortcut to activate screenshot mode
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+X to activate OCR screenshot
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyX') {
+      e.preventDefault();
+      enterScreenshotMode();
+    }
+  });
+
 
   async function performOCR(imageUrl) {
     console.log('Starting OCR on image:', imageUrl);
@@ -338,7 +480,7 @@
     }).join('');
   }
 
-  function showClaudeResults(container, responseText) {
+  function showClaudeResults(container, responseText, originalText) {
     console.log('showClaudeResults called with text length:', responseText?.length);
     console.log('Response text preview:', responseText?.substring(0, 100));
 
@@ -381,12 +523,22 @@
 
     console.log('Formatted HTML length:', responseHtml.length);
 
+    const originalTextHtml = originalText ? `
+      <div style="background: #f0f2f5 !important; padding: 12px !important; margin-bottom: 12px !important; border-left: 4px solid #1877f2 !important; border-radius: 4px !important;">
+        <div style="font-weight: 600 !important; font-size: 12px !important; color: #1877f2 !important; margin-bottom: 6px !important;">📝 Original Text:</div>
+        <div style="font-size: 12px !important; color: #65676b !important; word-wrap: break-word !important; white-space: pre-wrap !important; max-height: 120px !important; overflow-y: auto !important;">
+          ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
+        </div>
+      </div>
+    ` : '';
+
     overlay.innerHTML = `
       <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 12px 16px !important; border-bottom: 1px solid #e4e6eb !important; flex-shrink: 0 !important; background: #fafbfc !important;">
         <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Fact-Check Analysis</span>
         <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important;">✕</button>
       </div>
       <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 16px !important; white-space: normal !important; word-wrap: break-word !important;">
+        ${originalTextHtml}
         ${responseHtml}
       </div>
     `;
@@ -476,7 +628,7 @@
             showError(article, response.error);
           } else if (response.result) {
             console.log('Showing Claude results, length:', response.result.length);
-            showClaudeResults(article, response.result);
+            showClaudeResults(article, response.result, text);
           } else {
             console.error('Unexpected response structure:', response);
             showError(article, 'Unexpected response from backend');
@@ -603,9 +755,68 @@
     console.log('✓ Button wrapper appended to body with fixed positioning');
   }
 
-  // Listen for messages from background script
+  // Store last clicked element for OCR fallback
+  let lastClickedElement = null;
+  document.addEventListener('contextmenu', (e) => {
+    lastClickedElement = e.target;
+  }, true);
+
+  // Extract image URL from element (handles img tags, divs with background images, etc)
+  function extractImageUrl(element) {
+    if (!element) return null;
+
+    // If it's an img tag, use src or data-src
+    if (element.tagName === 'IMG') {
+      return element.src || element.getAttribute('data-src');
+    }
+
+    // If it's a div or other element with background-image
+    const style = window.getComputedStyle(element);
+    const backgroundImage = style.backgroundImage;
+    if (backgroundImage && backgroundImage.startsWith('url')) {
+      const match = backgroundImage.match(/url\(['"]?([^'"()]+)['"]?\)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+
+    // Try data-src attribute (lazy loading)
+    const dataSrc = element.getAttribute('data-src');
+    if (dataSrc) {
+      return dataSrc;
+    }
+
+    // Look for nested img tag
+    const nestedImg = element.querySelector('img');
+    if (nestedImg) {
+      return nestedImg.src || nestedImg.getAttribute('data-src');
+    }
+
+    // Look for picture element
+    const picture = element.querySelector('picture');
+    if (picture) {
+      const source = picture.querySelector('source');
+      if (source) {
+        return source.srcset || source.getAttribute('data-srcset');
+      }
+      const img = picture.querySelector('img');
+      if (img) {
+        return img.src || img.getAttribute('data-src');
+      }
+    }
+
+    return null;
+  }
+
+  // Listen for messages from background script and popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'factCheckText') {
+    try {
+      if (request.action === 'activateScreenshot') {
+        console.log('Activating screenshot mode from popup');
+        enterScreenshotMode();
+        sendResponse({ success: true });
+        return true;
+      } else if (request.action === 'factCheckText') {
       const selectedText = request.text;
       console.log('Fact-checking selected text:', selectedText.substring(0, 100));
       performFactCheck(selectedText, document.body);
@@ -626,6 +837,33 @@
           console.error('OCR failed:', error);
           showError(document.body, `OCR Error: ${error.message}`);
         });
+    } else if (request.action === 'findImageForOCR') {
+      // Try to get image from the last clicked element (handles divs with background images too)
+      console.log('Finding image for OCR from page...');
+      const imageUrl = extractImageUrl(lastClickedElement);
+      console.log('Extracted image URL:', imageUrl);
+
+      if (imageUrl) {
+        performOCR(imageUrl)
+          .then(extractedText => {
+            if (extractedText && extractedText.trim().length > 0) {
+              console.log('OCR successful from fallback');
+              performFactCheck(extractedText, document.body);
+            } else {
+              showError(document.body, 'No text found in the image. Please try another image.');
+            }
+          })
+          .catch(error => {
+            console.error('OCR failed:', error);
+            showError(document.body, `OCR Error: ${error.message}`);
+          });
+      } else {
+        showError(document.body, 'Could not find image. Instagram images can be tricky - try using the popup to paste the image URL manually (right-click image → Copy image address).');
+      }
+    }
+    } catch (error) {
+      console.error('Message handler error:', error);
+      sendResponse({ error: error.message });
     }
   });
 
@@ -668,7 +906,7 @@
           if (response.error) {
             showError(container, response.error);
           } else if (response.result) {
-            showClaudeResults(container, response.result);
+            showClaudeResults(container, response.result, text);
           }
         }
       );
