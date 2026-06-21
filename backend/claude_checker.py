@@ -131,11 +131,11 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
         messages = [{"role": "user", "content": prompt}]
 
         # Tool use loop
-        max_iterations = 5
+        max_iterations = 3
         for iteration in range(max_iterations):
             logger.debug(f"Claude iteration {iteration + 1}")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     CLAUDE_API_URL,
                     headers={
@@ -207,6 +207,14 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response
 
+    except httpx.TimeoutException as e:
+        logger.error(f"Claude API request timed out: {e}")
+        # Return partial results if we have them
+        if len(messages) > 1:
+            for content_block in messages[-1].get("content", []):
+                if content_block.get("type") == "text":
+                    return content_block.get("text", "Analysis timed out. Partial results above.")
+        raise Exception("Fact-checking request timed out. Please try again.")
     except Exception as e:
         logger.error(f"Claude fact-check request failed: {e}", exc_info=True)
         raise
