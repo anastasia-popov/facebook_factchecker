@@ -1,13 +1,15 @@
-# Facebook Fact Checker Extension
+# Fact Checker Extension
 
-A Chrome extension that adds fact-checking capabilities to Facebook. Select text on Facebook, right-click, and choose "Fact Check Selection" to analyze claims with Claude.
+A Chrome extension that adds fact-checking capabilities to any website. Select text anywhere on the web, right-click, and choose "Fact Check Selection" to analyze claims with Claude or Google Fact Check API.
 
 ## How It Works
 
-1. **Text Selection**: Select any text on Facebook (posts, comments, etc.)
+1. **Text Selection**: Select any text on any website (posts, articles, comments, etc.)
 2. **Context Menu**: Right-click and choose "🔍 Fact Check Selection"
-3. **Claude Analysis**: Sends text to Claude API for comprehensive fact-checking
-4. **Results Display**: Shows analysis with key claims, verdicts, and recommendations
+3. **Fact-Checking**: Sends text to your chosen fact-checker:
+   - **Claude AI**: Comprehensive analysis with web search for primary sources
+   - **Google Fact Check**: Fast fact-checking against fact-checking organizations
+4. **Results Display**: Shows analysis with claims, verdicts, sources, and recommendations
 
 ## Setup
 
@@ -69,14 +71,20 @@ The extension uses a Python FastAPI backend for web search and Claude-based fact
 
 ## Usage
 
-1. **On Facebook**, select the text you want to fact-check
+Works on any website - Facebook, Twitter, news sites, Reddit, blogs, etc.
+
+1. **Select text** you want to fact-check (posts, articles, comments, etc.)
 2. **Right-click** on the selected text
 3. **Choose "🔍 Fact Check Selection"** from the context menu
-4. **Wait for results** (usually 3-5 seconds)
-5. **Results appear as an overlay** with Claude's analysis:
+4. **Wait for results** (Claude: 10-30s with web search, Google: 3-5s)
+5. **Results appear as a modal** with:
    - Key claims identified
-   - Fact-check status for each claim (True/False/Misleading/Unverified)
-   - Overall assessment and recommendations
+   - Fact-check status for each claim
+   - Sources with clickable links
+   - Overall accuracy assessment
+   - Recommendations for further verification
+
+**Tip:** Use the popup settings to choose between Claude (thorough) or Google (fast) fact-checking!
 
 ## Architecture
 

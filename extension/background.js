@@ -4,12 +4,11 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed/updated');
   chrome.storage.local.set({ claudeApiKey: '' });
 
-  // Create context menu for fact-checking
+  // Create context menu for fact-checking (works on all websites)
   chrome.contextMenus.create({
     id: 'factcheck-selection',
     title: '🔍 Fact Check Selection',
-    contexts: ['selection'],
-    documentUrlPatterns: ['https://www.facebook.com/*', 'https://facebook.com/*']
+    contexts: ['selection']
   });
 });
 
