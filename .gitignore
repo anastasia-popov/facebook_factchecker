@@ -1,0 +1,5 @@
+
+.env
+backend/.env
+extension/config.json
+backend/__pycache__/

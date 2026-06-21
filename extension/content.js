@@ -348,11 +348,18 @@
         (response) => {
           console.log('Response from background:', response);
 
-          if (response.error) {
+          if (!response) {
+            console.error('No response from background');
+            showError(article, 'No response from service worker');
+          } else if (response.error) {
+            console.error('Backend error:', response.error);
             showError(article, response.error);
           } else if (response.result) {
-            console.log('Showing Claude results');
+            console.log('Showing Claude results, length:', response.result.length);
             showClaudeResults(article, response.result);
+          } else {
+            console.error('Unexpected response structure:', response);
+            showError(article, 'Unexpected response from backend');
           }
 
           btn.disabled = false;

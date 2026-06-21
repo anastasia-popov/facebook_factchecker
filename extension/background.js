@@ -66,7 +66,11 @@ async function handleFactCheckWithBackend(text) {
     }
 
     const data = await response.json();
-    console.log('Backend analysis complete, length:', data.analysis.length);
+    console.log('Backend response data:', data);
+    console.log('Backend analysis complete, length:', data.analysis?.length);
+    if (!data.analysis) {
+      throw new Error('Backend returned empty analysis');
+    }
     return data.analysis;
   } catch (error) {
     console.error('Backend request error:', error);
