@@ -115,14 +115,18 @@ POST TEXT:
 
     prompt += """
 INSTRUCTIONS:
-1. Identify key claims in the post
-2. For each claim, determine if it's True, False, Misleading, or Unverified
-3. Provide sources with clickable URLs where found
-4. Give an overall assessment of the post's accuracy
-5. For each claim you want to verify further, use the web_search tool to gather more information
-6. After gathering additional information, provide recommendations for further fact-checking
+1. Identify the key claims in the post
+2. For each claim, use the web_search tool to find PRIMARY SOURCES that support or refute it
+3. Provide a fact-check analysis with:
+   - **Claim**: [brief statement]
+   - **Verdict**: True/False/Misleading/Unverified
+   - **Sources**: List primary sources with direct URLs (e.g., official websites, academic papers, government reports)
+   - **Evidence**: Brief explanation of what the sources say
+4. BE CONCISE - use short paragraphs, bullet points where possible
+5. PRIORITIZE PRIMARY SOURCES - link to original reports, official statements, peer-reviewed research
+6. INCLUDE DIRECT URLS for all sources in clickable format
 
-Use the web_search tool whenever you need to verify a claim or find specific information."""
+Do NOT include introductions, preamble, or explanations of what you'll do - start with the verdict immediately."""
 
     try:
         logger.debug(f"Starting fact-check with Claude (text length: {len(text)})")
@@ -193,26 +197,26 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
                                 "content": result_text
                             })
 
-                # If Claude has text response, we're done
-                if has_text:
-                    logger.debug("Claude provided text response, stopping iteration")
-                    break
-
-                # If Claude used tools, send results back
+                # If Claude used tools, send results back and continue
                 if has_tool_use and tool_results:
+                    logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
                     messages.append({"role": "user", "content": tool_results})
+                    # Continue the loop to get Claude's next response
+                elif has_text:
+                    # Claude provided text without requesting tools - we have the analysis
+                    logger.debug("Claude provided final analysis without more tools, stopping iteration")
+                    break
                 else:
-                    # Claude finished without needing more tools and no text - ask for final analysis
-                    logger.debug("Claude finished without text, requesting final analysis")
+                    # Claude finished without providing text or tools - ask for analysis
+                    logger.debug("Claude finished without text or tools, requesting final analysis")
                     messages.append({
                         "role": "user",
-                        "content": "Please provide your final fact-checking analysis based on all the information gathered so far."
+                        "content": "Based on all the information gathered, please provide your complete fact-checking analysis now."
                     })
-                    continue
 
-            # If we're at the last iteration and still no text, break and extract what we have
+            # If we're at the last iteration, break
             if iteration == max_iterations - 1:
-                logger.debug("Reached max iterations")
+                logger.debug(f"Reached max iterations ({max_iterations}), exiting loop")
                 break
 
         # Extract final text response - search backwards through messages for latest assistant text
@@ -239,6 +243,12 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
             for i, msg in enumerate(messages):
                 logger.error(f"Message {i}: {msg}")
             raise Exception("Claude did not return text analysis")
+
+        # Truncate response if too long to keep UI responsive
+        max_response_length = 3000
+        if len(final_response) > max_response_length:
+            final_response = final_response[:max_response_length].rstrip() + "\n\n[Analysis truncated for display. Full analysis available on backend.]"
+            logger.debug(f"Truncated response from {len(final_response)} to {max_response_length} chars")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response

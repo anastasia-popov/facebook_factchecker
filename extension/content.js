@@ -289,7 +289,7 @@
         <span class="fc-title">Claude Fact-Check Analysis</span>
         <button class="fc-close" aria-label="Close">✕</button>
       </div>
-      <div class="fc-claude-response" style="max-height: 500px !important; overflow-y: auto !important;">
+      <div class="fc-claude-response" style="max-height: 400px !important; overflow-y: auto !important; padding-right: 8px !important;">
         ${responseHtml}
       </div>
     `;
