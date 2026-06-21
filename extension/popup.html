@@ -107,6 +107,20 @@
   </div>
 
   <div class="form-group">
+    <label>Fact-Checking Method</label>
+    <div style="display: flex; gap: 16px; margin-top: 8px;">
+      <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; margin: 0;">
+        <input type="radio" name="factChecker" value="claude" id="claudeRadio">
+        Claude AI
+      </label>
+      <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; margin: 0;">
+        <input type="radio" name="factChecker" value="google" id="googleRadio">
+        Google Fact Check
+      </label>
+    </div>
+  </div>
+
+  <div class="form-group">
     <label for="claudeApiKey">Claude API Key</label>
     <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
   </div>

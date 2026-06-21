@@ -30,7 +30,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Message received from', sender.url, 'action:', request?.action);
   if (request.action === 'factCheckWithClaude') {
     console.log('Starting fact check with text length:', request.text?.length);
-    handleFactCheckWithBackend(request.text)
+    handleFactCheck(request.text)
       .then(result => {
         console.log('Fact check complete, sending response');
         sendResponse({ result });
@@ -43,11 +43,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function handleFactCheckWithBackend(text) {
-  console.log('Calling backend /claude-fact-check endpoint');
+async function handleFactCheck(text) {
+  // Get the selected fact-checker method
+  const { factChecker } = await chrome.storage.local.get(['factChecker']);
+  const method = factChecker || 'claude';
+
+  console.log(`Calling backend with ${method} fact-checker`);
 
   try {
-    const response = await fetch('http://localhost:8000/claude-fact-check', {
+    // Choose endpoint based on selected method
+    const endpoint = method === 'claude' ? '/claude-fact-check' : '/fact-check';
+    const url = `http://localhost:8000${endpoint}`;
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -66,14 +74,53 @@ async function handleFactCheckWithBackend(text) {
     }
 
     const data = await response.json();
-    console.log('Backend response data:', data);
-    console.log('Backend analysis complete, length:', data.analysis?.length);
-    if (!data.analysis) {
+
+    // Handle different response formats
+    let analysis;
+    if (method === 'claude') {
+      analysis = data.analysis;
+      console.log('Claude analysis complete, length:', analysis?.length);
+    } else {
+      // Google API returns claims array, format it for display
+      analysis = formatGoogleFactCheckResults(data.claims);
+      console.log('Google fact-check complete, formatted length:', analysis.length);
+    }
+
+    if (!analysis) {
       throw new Error('Backend returned empty analysis');
     }
-    return data.analysis;
+
+    return analysis;
   } catch (error) {
     console.error('Backend request error:', error);
     throw error;
   }
+}
+
+function formatGoogleFactCheckResults(claims) {
+  if (!claims || claims.length === 0) {
+    return 'No fact-checkable claims found in this post.';
+  }
+
+  let result = '## Fact-Check Results (Google Fact Check API)\n\n';
+
+  for (const claim of claims) {
+    result += `**Claim:** ${claim.text}\n`;
+    result += `**Score:** ${(claim.score * 100).toFixed(0)}% check-worthiness\n`;
+
+    if (claim.verdict) {
+      result += `**Verdict:** ${claim.verdict}\n`;
+    }
+
+    if (claim.sources && claim.sources.length > 0) {
+      result += '**Sources:**\n';
+      for (const source of claim.sources) {
+        result += `- ${source.publisher}: ${source.url}\n`;
+      }
+    }
+
+    result += '\n';
+  }
+
+  return result;
 }
