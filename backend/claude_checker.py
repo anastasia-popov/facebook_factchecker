@@ -133,7 +133,7 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
         # Tool use loop
         max_iterations = 3
         for iteration in range(max_iterations):
-            logger.debug(f"Claude iteration {iteration + 1}")
+            logger.debug(f"Claude iteration {iteration + 1}/{max_iterations}")
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
@@ -163,10 +163,13 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
 
                 # Check if Claude wants to use tools
                 has_tool_use = False
+                has_text = False
                 tool_results = []
 
                 for content_block in data["content"]:
-                    if content_block.get("type") == "tool_use":
+                    if content_block.get("type") == "text":
+                        has_text = True
+                    elif content_block.get("type") == "tool_use":
                         has_tool_use = True
                         tool_name = content_block.get("name")
                         tool_input = content_block.get("input")
@@ -190,12 +193,27 @@ Use the web_search tool whenever you need to verify a claim or find specific inf
                                 "content": result_text
                             })
 
+                # If Claude has text response, we're done
+                if has_text:
+                    logger.debug("Claude provided text response, stopping iteration")
+                    break
+
                 # If Claude used tools, send results back
                 if has_tool_use and tool_results:
                     messages.append({"role": "user", "content": tool_results})
                 else:
-                    # Claude finished without needing more tools
-                    break
+                    # Claude finished without needing more tools and no text - ask for final analysis
+                    logger.debug("Claude finished without text, requesting final analysis")
+                    messages.append({
+                        "role": "user",
+                        "content": "Please provide your final fact-checking analysis based on all the information gathered so far."
+                    })
+                    continue
+
+            # If we're at the last iteration and still no text, break and extract what we have
+            if iteration == max_iterations - 1:
+                logger.debug("Reached max iterations")
+                break
 
         # Extract final text response - search backwards through messages for latest assistant text
         logger.debug(f"Messages length: {len(messages)}")
