@@ -607,26 +607,6 @@
   }
 
   function showLoadingAnimation() {
-    // Add keyframes FIRST before creating animated elements
-    if (!document.getElementById('fc-keyframes')) {
-      const styleSheet = document.createElement('style');
-      styleSheet.id = 'fc-keyframes';
-      styleSheet.textContent = `
-        @keyframes fc-magnify {
-          0% { transform: translate(0, -14px) rotate(-15deg); }
-          12.5% { transform: translate(10px, -10px) rotate(-15deg); }
-          25% { transform: translate(14px, 0) rotate(-15deg); }
-          37.5% { transform: translate(10px, 10px) rotate(-15deg); }
-          50% { transform: translate(0, 14px) rotate(-15deg); }
-          62.5% { transform: translate(-10px, 10px) rotate(-15deg); }
-          75% { transform: translate(-14px, 0) rotate(-15deg); }
-          87.5% { transform: translate(-10px, -10px) rotate(-15deg); }
-          100% { transform: translate(0, -14px) rotate(-15deg); }
-        }
-      `;
-      document.head.appendChild(styleSheet);
-    }
-
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay fc-overlay-loading';
     overlay.setAttribute('data-fc-overlay', 'true');
@@ -653,7 +633,7 @@
     `;
 
     overlay.innerHTML = `
-      <div style="font-size: 48px; display: inline-block; animation: fc-magnify 2.5s ease-in-out infinite;">🔍</div>
+      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 60px; height: 60px; object-fit: contain;">
       <div style="font-weight: 500; color: #0891B2;">Fact-checking...</div>
     `;
 

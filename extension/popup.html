@@ -47,17 +47,6 @@
     button:hover {
       background-color: #2a8f40;
     }
-    @keyframes fc-magnify {
-      0% { transform: translate(0, -14px) rotate(-15deg); }
-      12.5% { transform: translate(10px, -10px) rotate(-15deg); }
-      25% { transform: translate(14px, 0) rotate(-15deg); }
-      37.5% { transform: translate(10px, 10px) rotate(-15deg); }
-      50% { transform: translate(0, 14px) rotate(-15deg); }
-      62.5% { transform: translate(-10px, 10px) rotate(-15deg); }
-      75% { transform: translate(-14px, 0) rotate(-15deg); }
-      87.5% { transform: translate(-10px, -10px) rotate(-15deg); }
-      100% { transform: translate(0, -14px) rotate(-15deg); }
-    }
     #loadingContainer {
       display: none;
       text-align: center;
@@ -70,8 +59,9 @@
       align-items: center;
     }
     .loading-icon {
-      font-size: 48px;
-      animation: fc-magnify 2.5s ease-in-out infinite;
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
     }
     .loading-text {
       font-weight: 500;
@@ -93,7 +83,7 @@
   </div>
 
   <div id="loadingContainer">
-    <div class="loading-icon">🔍</div>
+    <img src="loader_animation.gif" class="loading-icon" alt="Loading...">
     <div class="loading-text">Fact-checking...</div>
   </div>
 </body>
