@@ -627,7 +627,6 @@
           </g>
         </svg>
       </div>
-      <div style="font-weight: 500; color: #0891B2; flex-shrink: 0; padding: 16px; width: 100%; text-align: center; box-sizing: border-box;">Fact-checking...</div>
     `;
 
     document.body.appendChild(overlay);
