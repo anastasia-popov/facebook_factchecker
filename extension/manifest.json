@@ -3,14 +3,15 @@
   "name": "Fact Checker",
   "version": "1.1",
   "description": "Fact-check text and images on any website with Claude AI.",
-  "permissions": ["contextMenus"],
+  "permissions": ["contextMenus", "storage"],
   "content_security_policy": {
     "script-src": ["'self'"],
     "worker-src": ["'self'"]
   },
   "host_permissions": [
     "https://*/*",
-    "http://*/*"
+    "http://*/*",
+    "https://github.com/*"
   ],
   "content_scripts": [
     {

@@ -9,10 +9,11 @@
       "strict_min_version": "109.0"
     }
   },
-  "permissions": ["contextMenus"],
+  "permissions": ["contextMenus", "storage"],
   "host_permissions": [
     "https://*/*",
-    "http://*/*"
+    "http://*/*",
+    "https://github.com/*"
   ],
   "content_scripts": [
     {

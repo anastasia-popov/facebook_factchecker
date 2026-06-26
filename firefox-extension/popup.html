@@ -3,12 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     body {
       width: 350px;
-      padding: 16px;
+      min-height: 200px;
+      padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
       font-size: 13px;
       color: #050505;
+      background: #ffffff;
+    }
+    .panel {
+      display: none;
+      padding: 16px;
+    }
+    .panel.active {
+      display: block;
+    }
+    .header {
+      background: linear-gradient(135deg, #F0F9FB 0%, #F5FEFB 100%);
+      border-bottom: 2px solid #0891B2;
+      padding: 12px 16px;
+      margin: -16px -16px 16px -16px;
+    }
+    .header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0891B2;
+      margin: 0;
     }
     .form-group {
       margin-bottom: 12px;
@@ -24,14 +50,14 @@
       padding: 8px;
       border: 1px solid #e4e6eb;
       border-radius: 4px;
-      font-family: monospace;
-      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
       box-sizing: border-box;
     }
     input:focus {
       outline: none;
-      border-color: #1877f2;
-      box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
+      border-color: #0891B2;
+      box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
     }
     button {
       background-color: #0891B2;
@@ -48,78 +74,155 @@
     button:hover {
       background-color: #0a6b8a;
     }
-    #loadingContainer {
-      display: none;
-      text-align: center;
-      padding: 0;
-      gap: 0;
-      width: 100%;
-      height: 350px;
-      justify-content: center;
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
     }
-    #loadingContainer.show {
+    button.secondary {
+      background-color: #e5e7eb;
+      color: #050505;
+      margin-top: 8px;
+    }
+    button.secondary:hover {
+      background-color: #d1d5db;
+    }
+    .profile-section {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .profile-item {
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
     }
-    .loading-icon {
-      width: 100%;
-      height: 85%;
-      object-fit: contain;
-      flex: 1;
+    .profile-item label {
+      font-weight: 600;
+      margin: 0;
+      color: #374151;
     }
-    .loading-text {
-      font-weight: 500;
+    .profile-item value {
       color: #0891B2;
-      flex-shrink: 0;
-      padding: 16px;
-      width: 100%;
-      box-sizing: border-box;
+      font-weight: 500;
+    }
+    .quota-bar {
+      background: #e5e7eb;
+      height: 6px;
+      border-radius: 3px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .quota-fill {
+      height: 100%;
+      background: #0891B2;
+      transition: width 0.3s;
+    }
+    .error {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: #7F1D1D;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .success {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      color: #166534;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #0891B2;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <div id="contentContainer">
-    <div class="form-group">
-      <label for="imageUrl">Image URL or Paste Screenshot</label>
-      <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
-      <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
-        📋 Paste image from clipboard (Ctrl+V) or paste image URL
+  <!-- Login Panel -->
+  <div id="loginPanel" class="panel active">
+    <div class="header">
+      <h2>🔐 Fact Checker</h2>
+    </div>
+    <p style="color: #6b7280; margin-bottom: 16px;">Sign in with your GitHub account to start fact-checking.</p>
+    <button id="loginBtn">Sign in with GitHub</button>
+    <div id="loginError" class="error" style="display: none;"></div>
+  </div>
+
+  <!-- Profile Panel -->
+  <div id="profilePanel" class="panel">
+    <div class="header">
+      <h2>👤 Profile</h2>
+    </div>
+
+    <div class="profile-section">
+      <div class="profile-item">
+        <label>Username</label>
+        <span id="username"></span>
+      </div>
+      <div class="profile-item">
+        <label>Member Since</label>
+        <span id="memberSince"></span>
       </div>
     </div>
 
-    <button id="ocrBtn">Extract Text & Fact-Check</button>
+    <div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+      <div style="font-weight: 700; color: #050505; margin-bottom: 12px;">📊 Daily Quota</div>
+      <div class="profile-item">
+        <label>Used Today</label>
+        <span id="dailyUsed">0</span> / <span id="dailyLimit">200</span>
+      </div>
+      <div class="quota-bar">
+        <div id="dailyBar" class="quota-fill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+      <div style="font-weight: 700; color: #050505; margin-bottom: 12px;">📅 Monthly Quota</div>
+      <div class="profile-item">
+        <label>Used This Month</label>
+        <span id="monthlyUsed">0</span> / <span id="monthlyLimit">5000</span>
+      </div>
+      <div class="quota-bar">
+        <div id="monthlyBar" class="quota-fill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div id="contentContainer">
+      <div class="form-group">
+        <label for="imageUrl">Image URL or Paste Screenshot</label>
+        <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
+        <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
+          📋 Paste image from clipboard (Ctrl+V) or paste image URL
+        </div>
+      </div>
+      <button id="ocrBtn">Extract Text & Fact-Check</button>
+    </div>
+
+    <button id="logoutBtn" class="secondary">Logout</button>
   </div>
 
-  <div id="loadingContainer">
-    <svg class="loading-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter height="140%" id="glass-shadow" width="140%" x="-20%" y="-20%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="2"></feGaussianBlur>
-          <feOffset dx="1" dy="1" result="offsetblur"></feOffset>
-          <feComponentTransfer>
-            <feFuncA slope="0.3" type="linear"></feFuncA>
-          </feComponentTransfer>
-          <feMerge>
-            <feMergeNode></feMergeNode>
-            <feMergeNode in="SourceGraphic"></feMergeNode>
-          </feMerge>
-        </filter>
-      </defs>
-      <g filter="url(#glass-shadow)">
-        <g>
-          <animateMotion dur="4s" path="M 50,35 A 15,15 0 1 1 49.99,35 Z" repeatCount="indefinite"></animateMotion>
-          <g transform="rotate(-45)">
-            <rect fill="#0a6b8a" height="25" rx="1" width="6" x="-3" y="15"></rect>
-            <circle cx="0" cy="0" fill="none" r="18" stroke="#0a6b8a" stroke-width="6"></circle>
-            <circle cx="0" cy="0" fill="rgba(8, 145, 178, 0.15)" r="16"></circle>
-            <path d="M-8 -8 Q -4 -12 0 -8" fill="none" opacity="0.6" stroke="white" stroke-linecap="round" stroke-width="1.5"></path>
-          </g>
-        </g>
-      </g>
-    </svg>
-    <div class="loading-text">Fact-checking...</div>
+  <div id="loadingContainer" style="display: none; text-align: center; padding: 16px;">
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+      <div class="loading-spinner"></div>
+      <span>Processing...</span>
+    </div>
   </div>
+
+  <script src="popup.js"></script>
 </body>
-<script src="popup.js"></script>
 </html>
