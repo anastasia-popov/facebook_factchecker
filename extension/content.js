@@ -483,11 +483,11 @@
   function markdownToHtml(text) {
     let html = parseTextWithLinks(text);
 
-    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #050505 !important;">$1</h3>');
-    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #050505 !important;">$1</h2>');
-    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #050505 !important;">$1</h1>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #0891B2 !important;">$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h2>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h1>');
 
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #050505 !important; font-weight: 700 !important;">$1</strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #1F2937 !important; font-weight: 700 !important;">$1</strong>');
 
     html = html.replace(/\n/g, '<br>');
 
@@ -513,21 +513,21 @@
       top: 20px !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
-      background: white !important;
-      border: 1px solid #e4e6eb !important;
-      border-radius: 8px !important;
+      background: #FFFFFF !important;
+      border: 1px solid #E5E7EB !important;
+      border-radius: 12px !important;
       padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #050505 !important;
+      color: #374151 !important;
       z-index: 999999 !important;
-      line-height: 1.5 !important;
+      line-height: 1.6 !important;
       width: 90% !important;
       max-width: 700px !important;
       max-height: calc(100vh - 40px) !important;
       display: flex !important;
       flex-direction: column !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
     `;
 
     const responseHtml = markdownToHtml(responseText);
@@ -535,20 +535,20 @@
     console.log('Formatted HTML length:', responseHtml.length);
 
     const originalTextHtml = originalText ? `
-      <div style="background: #f0f2f5 !important; padding: 12px !important; margin-bottom: 12px !important; border-left: 4px solid #1877f2 !important; border-radius: 4px !important;">
-        <div style="font-weight: 600 !important; font-size: 12px !important; color: #1877f2 !important; margin-bottom: 6px !important;">📝 Original Text:</div>
-        <div style="font-size: 12px !important; color: #65676b !important; word-wrap: break-word !important; white-space: pre-wrap !important; max-height: 120px !important; overflow-y: auto !important;">
+      <div style="background: #F0F9FB !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #0891B2 !important; border-radius: 6px !important;">
+        <div style="font-weight: 700 !important; font-size: 12px !important; color: #0891B2 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important;">📝 Original Text</div>
+        <div style="font-size: 13px !important; color: #4B5563 !important; word-wrap: break-word !important; white-space: pre-wrap !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important;">
           ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
         </div>
       </div>
     ` : '';
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 12px 16px !important; border-bottom: 1px solid #e4e6eb !important; flex-shrink: 0 !important; background: #fafbfc !important;">
-        <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important;">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #0891B2 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F0F9FB 0%, #F5FEFB 100%) !important;">
+        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #0891B2 !important;">✓ Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #9CA3AF !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9CA3AF'">✕</button>
       </div>
-      <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 16px !important; white-space: normal !important; word-wrap: break-word !important;">
+      <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
         ${originalTextHtml}
         ${responseHtml}
       </div>
@@ -573,24 +573,24 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: #fff3cd !important;
-      border: 1px solid #ffc107 !important;
-      border-radius: 8px !important;
+      background: #FEF2F2 !important;
+      border: 1px solid #FECACA !important;
+      border-radius: 12px !important;
       padding: 16px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #856404 !important;
+      color: #7F1D1D !important;
       z-index: 999999 !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
       max-width: 400px !important;
       display: flex !important;
-      gap: 8px !important;
+      gap: 12px !important;
       align-items: flex-start !important;
     `;
     overlay.innerHTML = `
       <span class="fc-error-icon" style="font-size: 20px !important; flex-shrink: 0 !important;">⚠️</span>
       <span style="flex: 1 !important;">${escapeHtml(message)}</span>
-      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #856404 !important; padding: 0 !important;">✕</button>
+      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #D97706 !important; padding: 0 !important; transition: color 0.2s !important;" onmouseover="this.style.color='#7F1D1D'" onmouseout="this.style.color='#D97706'">✕</button>
     `;
     overlay.querySelector('.fc-close').addEventListener('click', () => overlay.remove());
     document.body.appendChild(overlay);
