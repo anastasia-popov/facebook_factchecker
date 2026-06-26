@@ -28,7 +28,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["loader_animation.gif"],
+      "resources": ["loader.svg"],
       "matches": ["https://*/*", "http://*/*"]
     }
   ]

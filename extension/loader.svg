@@ -1,0 +1,30 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<filter height="140%" id="glass-shadow" width="140%" x="-20%" y="-20%">
+<fegaussianblur in="SourceAlpha" stddeviation="2"></fegaussianblur>
+<feoffset dx="1" dy="1" result="offsetblur"></feoffset>
+<fecomponenttransfer>
+<fefunca slope="0.3" type="linear"></fefunca>
+</fecomponenttransfer>
+<femerge>
+<femergenode></femergenode>
+<femergenode in="SourceGraphic"></femergenode>
+</femerge>
+</filter>
+</defs>
+<g filter="url(#glass-shadow)">
+<g>
+<animateMotion dur="4s" path="M 50,35 A 15,15 0 1 1 49.99,35 Z" repeatCount="indefinite"></animateMotion>
+<g transform="rotate(-45)">
+<!-- Handle -->
+<rect fill="#0a6b8a" height="25" rx="1" width="6" x="-3" y="15"></rect>
+<!-- Rim -->
+<circle cx="0" cy="0" fill="none" r="18" stroke="#0a6b8a" stroke-width="6"></circle>
+<!-- Glass surface -->
+<circle cx="0" cy="0" fill="rgba(8, 145, 178, 0.15)" r="16"></circle>
+<!-- Shine/Reflect -->
+<path d="M-8 -8 Q -4 -12 0 -8" fill="none" opacity="0.6" stroke="white" stroke-linecap="round" stroke-width="1.5"></path>
+</g>
+</g>
+</g>
+</svg>

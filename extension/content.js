@@ -635,7 +635,9 @@
     `;
 
     overlay.innerHTML = `
-      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 100%; height: 85%; object-fit: contain; flex: 1;">
+      <div style="width: 100%; height: 85%; flex: 1;">
+        <img src="${chrome.runtime.getURL('loader.svg')}" style="width: 100%; height: 100%; object-fit: contain;">
+      </div>
       <div style="font-weight: 500; color: #0891B2; flex-shrink: 0; padding: 16px; width: 100%; text-align: center; box-sizing: border-box;">Fact-checking...</div>
     `;
 
