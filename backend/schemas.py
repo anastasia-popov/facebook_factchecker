@@ -36,16 +36,6 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
-class UserProfile(BaseModel):
-    """User profile and quota information"""
-    id: int
-    github_username: str
-    created_at: datetime
-    last_login: datetime
-    quotas: QuotaInfo
-    usage: UsageInfo
-
-
 class QuotaInfo(BaseModel):
     """User quota information"""
     monthly_limit: int
@@ -62,6 +52,16 @@ class UsageInfo(BaseModel):
     total_ocr_requests: int
     total_fact_checks: int
     last_request: Optional[datetime]
+
+
+class UserProfile(BaseModel):
+    """User profile and quota information"""
+    id: int
+    google_email: str
+    created_at: datetime
+    last_login: datetime
+    quotas: QuotaInfo
+    usage: UsageInfo
 
 
 class FactCheckRequest(BaseModel):
