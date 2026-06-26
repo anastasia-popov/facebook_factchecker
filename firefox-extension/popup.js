@@ -94,11 +94,25 @@ function handleOAuthMessage(event) {
   }
 
   if (event.data && event.data.action === 'oauthCallback') {
-    if (event.data.success) {
-      handleOAuthSuccess(event.data.accessToken, event.data.refreshToken);
-    } else {
-      handleOAuthError(event.data.error || 'Authentication failed');
+    // OAuth callback window sent us the state parameter
+    // Now fetch the tokens from the backend
+    retrieveOAuthTokens(event.data.state);
+  }
+}
+
+async function retrieveOAuthTokens(state) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to retrieve tokens');
     }
+
+    const { access_token, refresh_token } = await response.json();
+    handleOAuthSuccess(access_token, refresh_token);
+  } catch (error) {
+    handleOAuthError(error.message);
   }
 }
 
@@ -181,8 +195,8 @@ async function loadUserProfile() {
 }
 
 function displayProfile(profile) {
-  // Username and member since
-  document.getElementById('username').textContent = profile.github_username;
+  // Email and member since
+  document.getElementById('username').textContent = profile.google_email;
   const memberDate = new Date(profile.created_at).toLocaleDateString();
   document.getElementById('memberSince').textContent = memberDate;
 
