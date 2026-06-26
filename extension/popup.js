@@ -1,4 +1,3 @@
-console.log('🔍 Fact Checker popup.js loaded');
 
 // Handle clipboard paste for images
 let clipboardImage = null;
@@ -9,7 +8,6 @@ document.getElementById('imageUrl').addEventListener('paste', async (e) => {
       e.preventDefault();
       clipboardImage = item.getAsFile();
       document.getElementById('imageUrl').value = '📷 Screenshot pasted (' + clipboardImage.name + ')';
-      console.log('Image pasted from clipboard:', clipboardImage.name);
       break;
     }
   }
@@ -19,7 +17,6 @@ document.getElementById('imageUrl').addEventListener('paste', async (e) => {
 function initializeButton() {
   const btn = document.getElementById('ocrBtn');
   if (!btn) {
-    console.error('OCR button not found');
     setTimeout(initializeButton, 100);
     return;
   }
@@ -61,12 +58,10 @@ function initializeButton() {
 
         if (extractedText && extractedText.trim().length > 0) {
           // Send to content script for fact-checking
-          console.log('Sending fact-check message with extracted text');
           chrome.tabs.sendMessage(tab.id, {
             action: 'factCheckText',
             text: extractedText
           }, (response) => {
-            console.log('Fact-check initiated, closing popup');
             clipboardImage = null;
             setTimeout(() => window.close(), 500);
           });
@@ -95,7 +90,6 @@ function initializeButton() {
           alert('Error: ' + chrome.runtime.lastError.message);
           btn.disabled = false;
         } else {
-          console.log('Fact-check initiated, closing popup');
           setTimeout(() => window.close(), 500);
         }
       });

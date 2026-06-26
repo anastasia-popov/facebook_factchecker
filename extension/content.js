@@ -1,6 +1,5 @@
 (function () {
   const BACKEND_URL = 'http://localhost:8000';
-  console.log('🔍 Fact Checker: Content script loaded');
 
   // Screenshot/rectangle selection mode
   let screenshotMode = false;
@@ -9,7 +8,6 @@
 
   function enterScreenshotMode() {
     screenshotMode = true;
-    console.log('Screenshot mode activated - drag to select area');
 
     // Create overlay for screenshot mode
     const overlay = document.createElement('div');
@@ -97,7 +95,6 @@
         const left = Math.min(startX, e.clientX);
         const top = Math.min(startY, e.clientY);
 
-        console.log(`Capturing area: ${width}x${height} at (${left}, ${top})`);
         captureArea(left, top, width, height);
         screenshotMode = false;
       };
@@ -114,14 +111,12 @@
         instruction.remove();
         if (selectionBox) selectionBox.remove();
         document.removeEventListener('keydown', handleEscape);
-        console.log('Screenshot mode cancelled');
       }
     };
     document.addEventListener('keydown', handleEscape);
   }
 
   async function captureArea(x, y, width, height) {
-    console.log('Screenshot area selected:', width, 'x', height, 'at', x, ',', y);
 
     // Use browser's native screenshot API if available
     if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
@@ -144,9 +139,7 @@
     }
   });
 
-
   async function performOCR(imageUrl) {
-    console.log('Starting OCR on image:', imageUrl);
 
     let statusDiv;
 
@@ -173,9 +166,7 @@
       try {
         const response = await fetch(imageUrl);
         imageBlob = await response.blob();
-        console.log('Image downloaded, size:', imageBlob.size);
       } catch (e) {
-        console.log('Direct fetch failed, trying with no-cors...');
         const response = await fetch(imageUrl, { mode: 'no-cors' });
         imageBlob = await response.blob();
       }
@@ -202,16 +193,12 @@
         statusDiv.remove();
       }
 
-      console.log('OCR complete, extracted text length:', extractedText.length);
-      console.log('Extracted text preview:', extractedText.substring(0, 100));
-
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text found in the image');
       }
 
       return extractedText;
     } catch (error) {
-      console.error('OCR error:', error);
       if (statusDiv && statusDiv.parentNode) {
         statusDiv.remove();
       }
@@ -235,27 +222,21 @@
       searchUrl = `https://www.google.com/searchbyimage?image_url=${encodedUrl}`;
     }
 
-    console.log(`Opening ${service} reverse image search...`);
-    console.log(`URL: ${searchUrl}`);
     window.open(searchUrl, '_blank');
   }
 
   async function extractPostText(article) {
-    console.log('extractPostText called');
 
     if (!article) {
-      console.log('No article provided');
       return '';
     }
 
     try {
       // Wait for loading to complete (max 5 seconds)
-      console.log('Waiting for post to load...');
       let attempts = 0;
       while (attempts < 50) {
         const loadingElement = article.querySelector('[aria-label="Loading..."]');
         if (!loadingElement) {
-          console.log('Post loaded after', attempts * 100, 'ms');
           break;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -264,23 +245,15 @@
 
       // Debug: check article properties
       const articleStyles = getComputedStyle(article);
-      console.log('Article display:', articleStyles.display);
-      console.log('Article visibility:', articleStyles.visibility);
-      console.log('Article opacity:', articleStyles.opacity);
-      console.log('Article children count:', article.children.length);
-      console.log('Article HTML length:', article.innerHTML.length);
-      console.log('Article HTML (first 500):', article.innerHTML.substring(0, 500));
 
       // Find all post text paragraphs within the modal
       let text = '';
       const modal = document.querySelector('div[aria-modal="true"]');
 
       if (modal) {
-        console.log('✓ Found modal');
 
         // Extract text
         const postTextElements = modal.querySelectorAll('div[dir="auto"][style*="text-align: start"]');
-        console.log('Found', postTextElements.length, 'text elements');
 
         if (postTextElements.length > 0) {
           // Combine all text elements
@@ -289,17 +262,12 @@
           );
           text = textParts.filter(t => t.trim().length > 0).join('\n');
 
-          console.log('✓ Found post text elements in modal');
-          console.log('Post text length:', text.length);
-          console.log('Text preview:', text.substring(0, 300));
         } else {
-          console.log('✗ Post text elements not found in modal');
         }
 
         // Extract post images only (not avatars)
         const postImages = modal.querySelectorAll('img[data-imgperflogname="feedImage"]');
         if (postImages.length > 0) {
-          console.log('Found', postImages.length, 'post image(s) in modal');
 
           // Create reverse search panel
           const imageLinksDiv = document.createElement('div');
@@ -344,8 +312,6 @@
               }
             }
 
-            console.log(`🖼️ Image ${idx}: ${imgSrc}`);
-
             if (imgSrc && imgSrc.length > 10) {
               const btnTineye = document.createElement('button');
               btnTineye.textContent = `Image ${idx} - TinEye`;
@@ -386,7 +352,6 @@
           document.body.appendChild(imageLinksDiv);
         }
       } else {
-        console.log('✗ Modal not found');
       }
 
       // Clean up the text - remove common FB UI elements
@@ -397,12 +362,9 @@
       });
 
       text = lines.join('\n').trim();
-      console.log('Cleaned text length:', text.length);
-      console.log('Cleaned text preview:', text.substring(0, 300));
 
       return text.slice(0, 2000);
     } catch (e) {
-      console.error('Error extracting text:', e);
       return '';
     }
   }
@@ -463,7 +425,6 @@
 
   function parseTextWithLinks(text) {
     if (!text || typeof text !== 'string') {
-      console.error('parseTextWithLinks received invalid text:', text);
       return escapeHtml(String(text));
     }
 
@@ -541,11 +502,8 @@
   }
 
   function showClaudeResults(container, responseText, originalText) {
-    console.log('showClaudeResults called with text length:', responseText?.length);
-    console.log('Response text preview:', responseText?.substring(0, 100));
 
     if (!responseText || responseText.trim() === '') {
-      console.error('Empty response text received');
       showError(container, 'Received empty analysis from backend');
       return;
     }
@@ -578,8 +536,6 @@
 
     const responseHtml = markdownToHtml(responseText);
 
-    console.log('Formatted HTML length:', responseHtml.length);
-
     const originalTextHtml = originalText ? `
       <div style="background: #F0F9FB !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #0891B2 !important; border-radius: 6px !important;">
         <div style="font-weight: 700 !important; font-size: 12px !important; color: #0891B2 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important;">📝 Original Text</div>
@@ -602,7 +558,6 @@
 
     const closeBtn = overlay.querySelector('.fc-close');
     closeBtn.addEventListener('click', () => {
-      console.log('Closing overlay');
       overlay.remove();
     });
     closeBtn.addEventListener('mouseover', () => {
@@ -613,7 +568,6 @@
     });
 
     document.body.appendChild(overlay);
-    console.log('Overlay appended to body with fixed positioning');
   }
 
   function showLoadingAnimation() {
@@ -727,12 +681,10 @@
   }
 
   async function handleFactCheck(article, btn) {
-    console.log('handleFactCheck called');
     btn.disabled = true;
     btn.textContent = 'Checking…';
 
     const text = await extractPostText(article);
-    console.log('Post text:', text.length, 'chars');
 
     if (!text.trim()) {
       showError(article, 'Could not extract text from post.');
@@ -749,8 +701,6 @@
         .map(img => img.src || img.getAttribute('data-src'))
         .filter(url => url && url.length > 10);
 
-      console.log('Sending fact-check request to background service worker');
-
       // Show loading animation
       showLoadingAnimation();
 
@@ -762,22 +712,17 @@
           imageUrls: imageUrls
         },
         (response) => {
-          console.log('Response from background:', response);
 
           // Remove loading animation
           removeLoadingAnimation();
 
           if (!response) {
-            console.error('No response from background');
             showError(article, 'No response from service worker');
           } else if (response.error) {
-            console.error('Backend error:', response.error);
             showError(article, response.error);
           } else if (response.result) {
-            console.log('Showing Claude results, length:', response.result.length);
             showClaudeResults(article, response.result, text);
           } else {
-            console.error('Unexpected response structure:', response);
             showError(article, 'Unexpected response from backend');
           }
 
@@ -786,7 +731,6 @@
         }
       );
     } catch (e) {
-      console.error('Error:', e);
       removeLoadingAnimation();
       showError(article, `Error: ${e.message}`);
       btn.disabled = false;
@@ -795,24 +739,16 @@
   }
 
   function injectButton() {
-    console.log('injectButton() called');
-    console.log('Current URL:', window.location.href);
 
     if (!isDetailPage()) {
-      console.log('Not on detail page (URL check failed), skipping');
       return;
     }
-
-    console.log('✓ On detail page');
 
     // Find the main post container
     const article = document.querySelector('[role="article"]');
     if (!article) {
-      console.log('✗ Article not found with [role="article"]');
       return;
     }
-
-    console.log('✓ Article found:', article);
 
     // Store reference to this article globally so click handler can use it
     window._fcMainArticle = article;
@@ -820,12 +756,9 @@
     // Check if button already exists
     const existingWrapper = document.querySelector('[data-fc-wrapper]');
     if (existingWrapper) {
-      console.log('Button already exists, updating article reference');
       window._fcMainArticle = article;
       return;
     }
-
-    console.log('Creating button...');
 
     const btn = document.createElement('button');
     btn.className = 'fc-btn';
@@ -872,13 +805,10 @@
 
     // When button is clicked, use the stored article reference
     btn.addEventListener('click', () => {
-      console.log('Button clicked!');
       const articleToCheck = window._fcMainArticle;
       if (articleToCheck && articleToCheck.isConnected) {
-        console.log('Using stored article reference');
         handleFactCheck(articleToCheck, btn);
       } else {
-        console.log('Stored article reference stale, finding main article');
         const allArticles = Array.from(document.querySelectorAll('[role="article"]'));
         // The main post should be the one with the largest size
         const mainArticle = allArticles.reduce((max, current) => {
@@ -888,11 +818,9 @@
         }, allArticles[0]);
 
         if (mainArticle) {
-          console.log('Found main article, size:', mainArticle.offsetHeight * mainArticle.offsetWidth);
           window._fcMainArticle = mainArticle;
           handleFactCheck(mainArticle, btn);
         } else {
-          console.log('Could not find any article');
           alert('Could not find post. Please refresh the page.');
         }
       }
@@ -900,7 +828,6 @@
 
     // Append wrapper to body so it appears on top of everything
     document.body.appendChild(wrapper);
-    console.log('✓ Button wrapper appended to body with fixed positioning');
   }
 
   // Store last clicked element for OCR fallback
@@ -960,49 +887,40 @@
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
       if (request.action === 'activateScreenshot') {
-        console.log('Activating screenshot mode from popup');
         enterScreenshotMode();
         sendResponse({ success: true });
         return true;
       } else if (request.action === 'factCheckText') {
       const selectedText = request.text;
-      console.log('Fact-checking selected text:', selectedText.substring(0, 100));
       performFactCheck(selectedText, document.body);
     } else if (request.action === 'factCheckImage') {
       const imageUrl = request.imageUrl;
-      console.log('Extracting text from image:', imageUrl);
 
       performOCR(imageUrl)
         .then(extractedText => {
           if (extractedText && extractedText.trim().length > 0) {
-            console.log('OCR successful, performing fact-check on extracted text');
             performFactCheck(extractedText, document.body);
           } else {
             showError(document.body, 'No text found in the image. Please try another image.');
           }
         })
         .catch(error => {
-          console.error('OCR failed:', error);
           showError(document.body, `OCR Error: ${error.message}`);
         });
     } else if (request.action === 'findImageForOCR') {
       // Try to get image from the last clicked element (handles divs with background images too)
-      console.log('Finding image for OCR from page...');
       const imageUrl = extractImageUrl(lastClickedElement);
-      console.log('Extracted image URL:', imageUrl);
 
       if (imageUrl) {
         performOCR(imageUrl)
           .then(extractedText => {
             if (extractedText && extractedText.trim().length > 0) {
-              console.log('OCR successful from fallback');
               performFactCheck(extractedText, document.body);
             } else {
               showError(document.body, 'No text found in the image. Please try another image.');
             }
           })
           .catch(error => {
-            console.error('OCR failed:', error);
             showError(document.body, `OCR Error: ${error.message}`);
           });
       } else {
@@ -1010,7 +928,6 @@
       }
     }
     } catch (error) {
-      console.error('Message handler error:', error);
       sendResponse({ error: error.message });
     }
   });
@@ -1021,7 +938,6 @@
 
     try {
       // Send to background service worker
-      console.log('Sending message to background service worker');
       chrome.runtime.sendMessage(
         {
           action: 'factCheckWithClaude',
@@ -1029,7 +945,6 @@
           imageUrls: []
         },
         (response) => {
-          console.log('Got response from background:', response);
           removeLoadingAnimation();
 
           if (!response) {
@@ -1045,7 +960,6 @@
         }
       );
     } catch (e) {
-      console.error('Error sending message:', e);
       removeLoadingAnimation();
       showError(container, `Error: ${e.message}`);
     }
