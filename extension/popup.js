@@ -25,7 +25,10 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
 
   const btn = document.getElementById('ocrBtn');
   const originalText = btn.textContent;
-  btn.textContent = 'Processing...';
+
+  // Show loading animation
+  document.getElementById('contentContainer').style.display = 'none';
+  document.getElementById('loadingContainer').classList.add('show');
   btn.disabled = true;
 
   try {
@@ -62,19 +65,22 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
           window.close();
         } else {
           alert('No text found in the image');
-          btn.textContent = originalText;
+          document.getElementById('contentContainer').style.display = 'block';
+          document.getElementById('loadingContainer').classList.remove('show');
           btn.disabled = false;
         }
       } catch (error) {
         alert('Error: ' + error.message);
-        btn.textContent = originalText;
+        document.getElementById('contentContainer').style.display = 'block';
+        document.getElementById('loadingContainer').classList.remove('show');
         btn.disabled = false;
       }
     } else {
       // Handle URL
       if (!imageUrl.startsWith('http')) {
         alert('Please enter a valid image URL (starting with http or https)');
-        btn.textContent = originalText;
+        document.getElementById('contentContainer').style.display = 'block';
+        document.getElementById('loadingContainer').classList.remove('show');
         btn.disabled = false;
         return;
       }
@@ -86,6 +92,9 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
       }, (response) => {
         if (chrome.runtime.lastError) {
           alert('Error: ' + chrome.runtime.lastError.message);
+          document.getElementById('contentContainer').style.display = 'block';
+          document.getElementById('loadingContainer').classList.remove('show');
+          btn.disabled = false;
         } else {
           window.close();
         }
@@ -93,7 +102,8 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
     }
   } catch (error) {
     alert('Error: ' + error.message);
-    btn.textContent = originalText;
+    document.getElementById('contentContainer').style.display = 'block';
+    document.getElementById('loadingContainer').classList.remove('show');
     btn.disabled = false;
   }
 });

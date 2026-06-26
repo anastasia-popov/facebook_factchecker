@@ -47,18 +47,54 @@
     button:hover {
       background-color: #2a8f40;
     }
+    @keyframes fc-magnify {
+      0% { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(25deg) scale(1.05); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    @keyframes fc-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    #loadingContainer {
+      display: none;
+      text-align: center;
+      padding: 32px 16px;
+      gap: 16px;
+    }
+    #loadingContainer.show {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .loading-icon {
+      font-size: 48px;
+      animation: fc-magnify 2s ease-in-out infinite;
+    }
+    .loading-text {
+      font-weight: 500;
+      color: #0891B2;
+      animation: fc-pulse 1.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
-  <div class="form-group">
-    <label for="imageUrl">Image URL or Paste Screenshot</label>
-    <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
-    <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
-      📋 Paste image from clipboard (Ctrl+V) or paste image URL
+  <div id="contentContainer">
+    <div class="form-group">
+      <label for="imageUrl">Image URL or Paste Screenshot</label>
+      <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
+      <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
+        📋 Paste image from clipboard (Ctrl+V) or paste image URL
+      </div>
     </div>
+
+    <button id="ocrBtn">Extract Text & Fact-Check</button>
   </div>
 
-  <button id="ocrBtn">Extract Text & Fact-Check</button>
+  <div id="loadingContainer">
+    <div class="loading-icon">🔍</div>
+    <div class="loading-text">Searching and analyzing…</div>
+  </div>
 </body>
 <script src="popup.js"></script>
 </html>
