@@ -571,6 +571,72 @@
     console.log('Overlay appended to body with fixed positioning');
   }
 
+  function showLoadingAnimation() {
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-overlay fc-overlay-loading';
+    overlay.setAttribute('data-fc-overlay', 'true');
+    overlay.id = 'fc-loading-overlay';
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      background: white !important;
+      border: 1px solid #E5E7EB !important;
+      border-radius: 12px !important;
+      padding: 40px 32px !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      font-size: 14px !important;
+      color: #374151 !important;
+      z-index: 999999 !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+      max-width: 320px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 20px !important;
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      @keyframes fc-magnify {
+        0% { transform: rotate(0deg) scale(1); }
+        50% { transform: rotate(25deg) scale(1.05); }
+        100% { transform: rotate(0deg) scale(1); }
+      }
+      @keyframes fc-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+      .fc-loading-icon {
+        font-size: 48px !important;
+        animation: fc-magnify 2s ease-in-out infinite !important;
+        display: inline-block !important;
+      }
+      .fc-loading-text {
+        font-weight: 500 !important;
+        color: #0891B2 !important;
+        animation: fc-pulse 1.5s ease-in-out infinite !important;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+
+    overlay.innerHTML = `
+      <div class="fc-loading-icon">🔍</div>
+      <div class="fc-loading-text">Searching and analyzing…</div>
+    `;
+
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function removeLoadingAnimation() {
+    const overlay = document.getElementById('fc-loading-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+  }
+
   function showError(container, message) {
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay fc-overlay-error';
@@ -628,6 +694,9 @@
 
       console.log('Sending fact-check request to background service worker');
 
+      // Show loading animation
+      showLoadingAnimation();
+
       // Send message to background service worker to handle Claude API call
       chrome.runtime.sendMessage(
         {
@@ -637,6 +706,9 @@
         },
         (response) => {
           console.log('Response from background:', response);
+
+          // Remove loading animation
+          removeLoadingAnimation();
 
           if (!response) {
             console.error('No response from background');
@@ -658,6 +730,7 @@
       );
     } catch (e) {
       console.error('Error:', e);
+      removeLoadingAnimation();
       showError(article, `Error: ${e.message}`);
       btn.disabled = false;
       btn.textContent = '🔍 Fact Check';
