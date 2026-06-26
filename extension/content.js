@@ -485,33 +485,43 @@
       document.head.appendChild(styleSheet);
     }
 
-    // Process markdown-style links ONLY
-    // Split by markdown links to handle them separately
+    // Process markdown-style links and plain URLs
     const parts = [];
     const markdownRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const urlRegex = /(https?:\/\/[^\s<"']+)/g;
     let lastIndex = 0;
     let match;
 
     while ((match = markdownRegex.exec(text)) !== null) {
-      // Add text before the link (escaped)
+      // Add text before the link (with URLs converted to links)
       if (match.index > lastIndex) {
-        parts.push(escapeHtml(text.substring(lastIndex, match.index)));
+        const textBefore = text.substring(lastIndex, match.index);
+        parts.push(convertPlainUrlsToLinks(escapeHtml(textBefore)));
       }
 
-      // Add the link
+      // Add the markdown link
       const linkText = match[1];
       const url = match[2];
       parts.push(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(linkText)}</a>`);
       lastIndex = match.index + match[0].length;
     }
 
-    // Add remaining text (escaped)
+    // Add remaining text (with URLs converted to links)
     if (lastIndex < text.length) {
-      parts.push(escapeHtml(text.substring(lastIndex)));
+      const textAfter = text.substring(lastIndex);
+      parts.push(convertPlainUrlsToLinks(escapeHtml(textAfter)));
     }
 
-    // Return processed HTML (or just escaped text if no markdown links found)
-    return parts.length > 0 ? parts.join('') : escapeHtml(text);
+    return parts.length > 0 ? parts.join('') : convertPlainUrlsToLinks(escapeHtml(text));
+  }
+
+  function convertPlainUrlsToLinks(text) {
+    const urlRegex = /(https?:\/\/[^\s<"']+)/g;
+    return text.replace(urlRegex, (url) => {
+      // Remove trailing punctuation
+      const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="fc-link">${cleanUrl}</a>`;
+    });
   }
 
   function markdownToHtml(text) {
