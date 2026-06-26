@@ -984,22 +984,8 @@
   });
 
   async function performFactCheck(text, container) {
-    // Create a status message
-    const statusDiv = document.createElement('div');
-    statusDiv.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      z-index: 999999;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    `;
-    statusDiv.textContent = 'Fact-checking...';
-    document.body.appendChild(statusDiv);
+    // Show animated loading state
+    showLoadingAnimation();
 
     try {
       // Send to background service worker
@@ -1012,7 +998,7 @@
         },
         (response) => {
           console.log('Got response from background:', response);
-          statusDiv.remove();
+          removeLoadingAnimation();
 
           if (!response) {
             showError(container, 'No response from background service worker');
@@ -1028,7 +1014,7 @@
       );
     } catch (e) {
       console.error('Error sending message:', e);
-      statusDiv.remove();
+      removeLoadingAnimation();
       showError(container, `Error: ${e.message}`);
     }
   }
