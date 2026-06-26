@@ -1,6 +1,6 @@
 import logging
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +24,10 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Fact Checker Backend")
+
+# Temporary storage for OAuth tokens (keyed by state)
+# In production, use Redis or a database
+oauth_tokens_cache = {}
 
 # Initialize database
 init_db()
@@ -129,22 +133,32 @@ async def google_oauth_callback(
 
         logger.info(f"User authenticated via Google: {user_info['email']}")
 
-        # Return HTML page that posts tokens to popup and closes window
+        # Store tokens in cache for popup to retrieve
+        oauth_tokens_cache[state] = {
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'token_type': 'bearer',
+            'expires_in': 3600
+        }
+
+        # Return HTML page that closes the window
         html_content = f"""
         <html>
         <head><title>Authentication Successful</title></head>
         <body>
             <script>
-                // Send tokens to popup with window.opener.postMessage
-                window.opener.postMessage({{
-                    action: 'oauthCallback',
-                    accessToken: '{access_token}',
-                    refreshToken: '{refresh_token}',
-                    success: true
-                }}, '*');
+                // Tell popup to fetch tokens
+                if (window.opener) {{
+                    window.opener.postMessage({{
+                        action: 'oauthCallback',
+                        state: '{state}'
+                    }}, '*');
+                }}
 
-                // Close this window
-                window.close();
+                // Close this window after a short delay
+                setTimeout(() => {{
+                    window.close();
+                }}, 500);
             </script>
             <p>Authentication successful. This window should close automatically.</p>
         </body>
@@ -175,6 +189,16 @@ async def google_oauth_callback(
         return HTMLResponse(content=html_content, status_code=401)
 
 
+@app.get("/auth/google/get-tokens")
+async def get_oauth_tokens(state: str):
+    """Retrieve tokens that were stored during OAuth callback"""
+    if state not in oauth_tokens_cache:
+        raise HTTPException(status_code=404, detail="Tokens not found. Please try logging in again.")
+
+    tokens = oauth_tokens_cache.pop(state)  # Remove from cache after retrieval
+    return TokenResponse(**tokens)
+
+
 @app.post("/auth/refresh", response_model=TokenResponse)
 async def refresh_access_token(
     req: RefreshTokenRequest,
@@ -198,13 +222,13 @@ async def refresh_access_token(
 
         # Create new tokens
         new_refresh_token = jwt_manager.create_refresh_token()
-        access_token = jwt_manager.create_access_token(user.id, user.github_username)
+        access_token = jwt_manager.create_access_token(user.id, user.google_email)
 
         # Update user's refresh token
         UserManager.refresh_user_token(user, new_refresh_token, db_session)
         db_session.close()
 
-        logger.info(f"Token refreshed for user: {user.github_username}")
+        logger.info(f"Token refreshed for user: {user.google_email}")
 
         return TokenResponse(
             access_token=access_token,
@@ -250,7 +274,7 @@ async def get_user_profile(
 
         return UserProfile(
             id=user.id,
-            github_username=user.github_username,
+            google_email=user.google_email,
             created_at=user.created_at,
             last_login=user.last_login,
             quotas=QuotaInfo(
@@ -281,7 +305,7 @@ async def logout(
     """Logout user by invalidating refresh token"""
     try:
         UserManager.logout_user(user, db)
-        logger.info(f"User logged out: {user.github_username}")
+        logger.info(f"User logged out: {user.google_email}")
         return {"message": "Logged out successfully"}
     except Exception as e:
         logger.error(f"Error in logout: {e}", exc_info=True)
@@ -321,9 +345,9 @@ async def fact_check(
         )
 
     try:
-        logger.debug(f"[{user.github_username}] Processing text: {req.text[:100]}...")
+        logger.debug(f"[{user.google_email}] Processing text: {req.text[:100]}...")
         result = await run_fact_check(req.text)
-        logger.debug(f"[{user.github_username}] Result: {len(result.claims)} claims found")
+        logger.debug(f"[{user.google_email}] Result: {len(result.claims)} claims found")
         return result
     except Exception as e:
         logger.error(f"Error in fact_check: {type(e).__name__}: {e}", exc_info=True)
@@ -355,9 +379,9 @@ async def claude_fact_check(
         )
 
     try:
-        logger.debug(f"[{user.github_username}] Processing text with Claude: {req.text[:100]}...")
+        logger.debug(f"[{user.google_email}] Processing text with Claude: {req.text[:100]}...")
         analysis = await fact_check_with_claude(req.text)
-        logger.debug(f"[{user.github_username}] Claude analysis complete (length: {len(analysis)})")
+        logger.debug(f"[{user.google_email}] Claude analysis complete (length: {len(analysis)})")
 
         if not analysis or len(analysis.strip()) == 0:
             logger.error("Claude returned empty analysis")
@@ -367,7 +391,7 @@ async def claude_fact_check(
             analysis=analysis,
             post_text_preview=req.text[:100]
         )
-        logger.info(f"[{user.github_username}] Returning response with analysis length: {len(response.analysis)}")
+        logger.info(f"[{user.google_email}] Returning response with analysis length: {len(response.analysis)}")
         return response
     except Exception as e:
         logger.error(f"Error in claude_fact_check: {type(e).__name__}: {e}", exc_info=True)
@@ -394,7 +418,7 @@ async def extract_text_from_image(
         )
 
     try:
-        logger.debug(f"[{user.github_username}] Extracting text from image: {file.filename}")
+        logger.debug(f"[{user.google_email}] Extracting text from image: {file.filename}")
 
         # Read the uploaded image
         contents = await file.read()
@@ -404,10 +428,10 @@ async def extract_text_from_image(
         extracted_text = pytesseract.image_to_string(image)
 
         if not extracted_text or len(extracted_text.strip()) == 0:
-            logger.warning(f"[{user.github_username}] OCR returned empty text")
+            logger.warning(f"[{user.google_email}] OCR returned empty text")
             raise Exception("No text found in the image")
 
-        logger.debug(f"[{user.github_username}] OCR complete, extracted {len(extracted_text)} characters")
+        logger.debug(f"[{user.google_email}] OCR complete, extracted {len(extracted_text)} characters")
 
         return {
             "text": extracted_text,
