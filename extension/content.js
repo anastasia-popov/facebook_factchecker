@@ -140,10 +140,20 @@
   });
 
   async function performOCR(imageUrl) {
-
     let statusDiv;
 
     try {
+      // Get auth token
+      const auth = await new Promise((resolve) => {
+        chrome.storage.local.get('auth', (result) => {
+          resolve(result);
+        });
+      });
+
+      if (!auth.auth?.isAuthenticated) {
+        throw new Error('Not authenticated. Please log in via the extension popup.');
+      }
+
       // Show status
       statusDiv = document.createElement('div');
       statusDiv.style.cssText = `
@@ -171,6 +181,13 @@
         imageBlob = await response.blob();
       }
 
+      // Check token expiry
+      if (Date.now() >= auth.auth.accessTokenExpiry) {
+        statusDiv.textContent = 'Refreshing authentication...';
+        // Token expired, need to refresh
+        throw new Error('Session expired. Please log in again via the extension popup.');
+      }
+
       // Upload to backend for OCR
       statusDiv.textContent = 'Extracting text from image (backend OCR)...';
       const formData = new FormData();
@@ -178,8 +195,22 @@
 
       const ocrResponse = await fetch(`${BACKEND_URL}/ocr`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${auth.auth.accessToken}`
+        },
         body: formData
       });
+
+      // Handle authentication errors
+      if (ocrResponse.status === 401) {
+        throw new Error('Authentication failed. Please log in again via the extension popup.');
+      }
+
+      // Handle rate limit
+      if (ocrResponse.status === 429) {
+        const error = await ocrResponse.json();
+        throw new Error(`Rate limit exceeded: ${error.detail || 'Daily or monthly quota exceeded'}`);
+      }
 
       if (!ocrResponse.ok) {
         const error = await ocrResponse.json();

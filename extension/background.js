@@ -62,6 +62,67 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+const BACKEND_URL = 'http://localhost:8000';
+
+// ==================== Auth Token Management ====================
+
+async function getAuthToken() {
+  const auth = await chrome.storage.local.get('auth');
+  if (!auth.auth?.isAuthenticated) {
+    throw new Error('Not authenticated. Please log in via the extension popup.');
+  }
+  return auth.auth;
+}
+
+async function ensureValidToken() {
+  const auth = await getAuthToken();
+
+  // Check if token is expired
+  if (Date.now() >= auth.accessTokenExpiry) {
+    return await refreshAccessToken();
+  }
+
+  return auth.accessToken;
+}
+
+async function refreshAccessToken() {
+  try {
+    const auth = await chrome.storage.local.get('auth');
+
+    if (!auth.auth?.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await fetch(`${BACKEND_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        refresh_token: auth.auth.refreshToken
+      })
+    });
+
+    if (!response.ok) {
+      // Token refresh failed, user needs to re-login
+      await chrome.storage.local.remove('auth');
+      throw new Error('Session expired. Please log in again via the extension popup.');
+    }
+
+    const { access_token } = await response.json();
+
+    // Update stored token
+    auth.auth.accessToken = access_token;
+    auth.auth.accessTokenExpiry = Date.now() + (60 * 60 * 1000); // 1 hour
+    await chrome.storage.local.set({ auth });
+
+    return access_token;
+  } catch (error) {
+    await chrome.storage.local.remove('auth');
+    throw error;
+  }
+}
+
+// ==================== Message Handling ====================
+
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'factCheckWithClaude') {
@@ -76,18 +137,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// ==================== Fact Check API ====================
+
 async function handleFactCheck(text) {
   try {
-    const response = await fetch('http://localhost:8000/claude-fact-check', {
+    // Ensure we have a valid token
+    const accessToken = await ensureValidToken();
+
+    const response = await fetch(`${BACKEND_URL}/claude-fact-check`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         text: text
       })
     });
 
+    // Handle authentication errors
+    if (response.status === 401) {
+      // Try refreshing token and retry once
+      const newToken = await refreshAccessToken();
+
+      const retryResponse = await fetch(`${BACKEND_URL}/claude-fact-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${newToken}`
+        },
+        body: JSON.stringify({
+          text: text
+        })
+      });
+
+      if (!retryResponse.ok) {
+        const error = await retryResponse.json();
+        throw new Error(`Authentication failed: ${error.detail || 'Unknown error'}`);
+      }
+
+      const data = await retryResponse.json();
+      return data.analysis;
+    }
+
+    // Handle rate limit errors
+    if (response.status === 429) {
+      const error = await response.json();
+      throw new Error(`Rate limit exceeded: ${error.detail || 'Please try again later'}`);
+    }
+
+    // Handle other errors
     if (!response.ok) {
       const error = await response.json();
       throw new Error(`Backend error: ${error.detail || 'Unknown error'}`);
