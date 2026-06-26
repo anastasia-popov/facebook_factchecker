@@ -154,7 +154,7 @@
         throw new Error('Not authenticated. Please log in via the extension popup.');
       }
 
-      // Show status
+      // Show loading animation only (no text)
       statusDiv = document.createElement('div');
       statusDiv.style.cssText = `
         position: fixed;
@@ -166,9 +166,32 @@
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         z-index: 999999;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       `;
-      statusDiv.textContent = 'Downloading image...';
+
+      // Create loading spinner
+      const spinner = document.createElement('div');
+      spinner.style.cssText = `
+        display: inline-block;
+        width: 32px;
+        height: 32px;
+        border: 3px solid #0891B2;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.8s linear infinite;
+      `;
+
+      // Add animation
+      if (!document.getElementById('spinnerStyle')) {
+        const style = document.createElement('style');
+        style.id = 'spinnerStyle';
+        style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+      }
+
+      statusDiv.appendChild(spinner);
       document.body.appendChild(statusDiv);
 
       // Fetch the image
@@ -183,13 +206,11 @@
 
       // Check token expiry
       if (Date.now() >= auth.auth.accessTokenExpiry) {
-        statusDiv.textContent = 'Refreshing authentication...';
         // Token expired, need to refresh
         throw new Error('Session expired. Please log in again via the extension popup.');
       }
 
       // Upload to backend for OCR
-      statusDiv.textContent = 'Extracting text from image (backend OCR)...';
       const formData = new FormData();
       formData.append('file', imageBlob, 'image.png');
 
