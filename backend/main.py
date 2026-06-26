@@ -1,48 +1,291 @@
 import logging
 import io
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
+from fastapi.security import HTTPBearer, HTTPAuthCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
 from claude_checker import fact_check_with_claude
 from config import settings
+from database import init_db, get_db, User
+from auth import oauth_manager, jwt_manager, UserManager
+from rate_limit import rate_limiter
+from schemas import (
+    OAuthStartResponse, OAuthCallbackRequest, TokenResponse, RefreshTokenRequest,
+    UserProfile, QuotaInfo, UsageInfo, HealthResponse
+)
 import httpx
 from PIL import Image
 import pytesseract
+from sqlalchemy.orm import Session
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Fact Checker Backend")
 
+# Initialize database
+init_db()
+
+# Security
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """Dependency to get authenticated user from JWT token"""
+    token = credentials.credentials
+
+    # Verify token
+    payload = jwt_manager.verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    user_id = int(payload.get("sub"))
+    user = UserManager.get_user_by_id(user_id, db)
+
+    if not user or not user.active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    return user
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "chrome-extension://*",
         "http://localhost:*",
+        "https://localhost:*",
         "https://www.facebook.com",
         "https://*.facebook.com",
         "https://facebook.com"
     ],
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
     allow_credentials=True,
 )
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+# ==================== Auth Endpoints ====================
 
+@app.post("/auth/start-oauth", response_model=OAuthStartResponse)
+async def start_oauth():
+    """Initiate OAuth flow with GitHub"""
+    try:
+        # Generate PKCE pair
+        code_verifier, code_challenge = oauth_manager.generate_pkce_pair()
+
+        # Generate state for CSRF protection
+        state = oauth_manager.generate_state()
+
+        # Get authorization URL
+        oauth_url = oauth_manager.get_authorization_url(state, code_challenge)
+
+        logger.info("OAuth flow initiated")
+
+        return OAuthStartResponse(
+            oauth_url=oauth_url,
+            state=state,
+            code_challenge=code_verifier  # Return verifier so frontend can store it
+        )
+    except Exception as e:
+        logger.error(f"Error in start_oauth: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to start OAuth flow")
+
+
+@app.post("/auth/callback", response_model=TokenResponse)
+async def oauth_callback(
+    req: OAuthCallbackRequest,
+    db: Session = Depends(get_db)
+):
+    """Handle OAuth callback and exchange code for tokens"""
+    try:
+        # Exchange authorization code for GitHub token
+        github_token_data = await oauth_manager.exchange_code_for_token(
+            req.code,
+            req.code_verifier
+        )
+
+        # Get user info from GitHub
+        user_info = await oauth_manager.get_user_info(github_token_data['access_token'])
+
+        # Create or update user
+        refresh_token = jwt_manager.create_refresh_token()
+        user = UserManager.create_or_update_user(
+            github_id=user_info['id'],
+            github_username=user_info['login'],
+            github_access_token=github_token_data['access_token'],
+            jwt_refresh_token=refresh_token,
+            db=db
+        )
+
+        # Create access token
+        access_token = jwt_manager.create_access_token(user.id, user.github_username)
+
+        logger.info(f"User authenticated: {user.github_username}")
+
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.jwt_expiration_minutes * 60
+        )
+    except Exception as e:
+        logger.error(f"Error in oauth_callback: {e}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+
+@app.post("/auth/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    req: RefreshTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """Refresh access token using refresh token"""
+    try:
+        # Find user by refresh token
+        from database import SessionLocal
+        db_session = SessionLocal()
+        user = db_session.query(User).filter(
+            User.jwt_refresh_token == req.refresh_token
+        ).first()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+        # Validate refresh token expiration
+        if user.jwt_refresh_token_expiry < datetime.utcnow():
+            raise HTTPException(status_code=401, detail="Refresh token expired")
+
+        # Create new tokens
+        new_refresh_token = jwt_manager.create_refresh_token()
+        access_token = jwt_manager.create_access_token(user.id, user.github_username)
+
+        # Update user's refresh token
+        UserManager.refresh_user_token(user, new_refresh_token, db_session)
+        db_session.close()
+
+        logger.info(f"Token refreshed for user: {user.github_username}")
+
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=new_refresh_token,
+            expires_in=settings.jwt_expiration_minutes * 60
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in refresh_access_token: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Token refresh failed")
+
+
+@app.get("/auth/profile", response_model=UserProfile)
+async def get_user_profile(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get authenticated user's profile and quota information"""
+    try:
+        # Get quota info
+        quota_info = rate_limiter.get_quota_info(user, db)
+
+        # Get usage stats
+        from database import UsageTracking
+        total_requests = db.query(UsageTracking).filter(
+            UsageTracking.user_id == user.id
+        ).count()
+
+        ocr_requests = db.query(UsageTracking).filter(
+            UsageTracking.user_id == user.id,
+            UsageTracking.endpoint == '/ocr'
+        ).count()
+
+        fact_check_requests = db.query(UsageTracking).filter(
+            UsageTracking.user_id == user.id,
+            UsageTracking.endpoint.in_(['/fact-check', '/claude-fact-check'])
+        ).count()
+
+        last_request = db.query(UsageTracking).filter(
+            UsageTracking.user_id == user.id
+        ).order_by(UsageTracking.request_timestamp.desc()).first()
+
+        return UserProfile(
+            id=user.id,
+            github_username=user.github_username,
+            created_at=user.created_at,
+            last_login=user.last_login,
+            quotas=QuotaInfo(
+                monthly_limit=quota_info['monthly_limit'],
+                monthly_used=quota_info['monthly_used'],
+                monthly_remaining=quota_info['monthly_remaining'],
+                daily_limit=quota_info['daily_limit'],
+                daily_used=quota_info['daily_used'],
+                daily_remaining=quota_info['daily_remaining']
+            ),
+            usage=UsageInfo(
+                total_requests=total_requests,
+                total_ocr_requests=ocr_requests,
+                total_fact_checks=fact_check_requests,
+                last_request=last_request.request_timestamp if last_request else None
+            )
+        )
+    except Exception as e:
+        logger.error(f"Error in get_user_profile: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get profile")
+
+
+@app.post("/auth/logout")
+async def logout(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Logout user by invalidating refresh token"""
+    try:
+        UserManager.logout_user(user, db)
+        logger.info(f"User logged out: {user.github_username}")
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        logger.error(f"Error in logout: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Logout failed")
+
+
+# ==================== Public Endpoints ====================
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    """Health check endpoint (public)"""
+    return HealthResponse(status="ok", message="Fact Checker Backend is running")
+
+
+# ==================== Protected Endpoints ====================
 
 @app.post("/fact-check", response_model=FactCheckResponse)
-async def fact_check(req: FactCheckRequest):
+async def fact_check(
+    req: FactCheckRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fact-check with Google API (protected, rate-limited)"""
     if not settings.google_api_key:
         raise HTTPException(status_code=503, detail="GOOGLE_API_KEY not configured")
+
+    # Check rate limit
+    allowed, quota_info = rate_limiter.check_and_record_usage(
+        user, "/fact-check", tokens_required=1, db=db
+    )
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Daily: {quota_info['daily_used']}/{quota_info['daily_limit']}, "
+                   f"Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
+        )
+
     try:
-        logger.debug(f"Processing text: {req.text[:100]}...")
+        logger.debug(f"[{user.github_username}] Processing text: {req.text[:100]}...")
         result = await run_fact_check(req.text)
-        logger.debug(f"Result: {len(result.claims)} claims found")
+        logger.debug(f"[{user.github_username}] Result: {len(result.claims)} claims found")
         return result
     except Exception as e:
         logger.error(f"Error in fact_check: {type(e).__name__}: {e}", exc_info=True)
@@ -50,16 +293,33 @@ async def fact_check(req: FactCheckRequest):
 
 
 @app.post("/claude-fact-check", response_model=ClaudeFactCheckResponse)
-async def claude_fact_check(req: FactCheckRequest):
+async def claude_fact_check(
+    req: FactCheckRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fact-check with Claude and web search (protected, rate-limited)"""
     if not settings.claude_api_key:
         raise HTTPException(status_code=503, detail="CLAUDE_API_KEY not configured")
     if not settings.serper_api_key:
         raise HTTPException(status_code=503, detail="SERPER_API_KEY not configured")
+
+    # Check rate limit
+    allowed, quota_info = rate_limiter.check_and_record_usage(
+        user, "/claude-fact-check", tokens_required=1, db=db
+    )
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Daily: {quota_info['daily_used']}/{quota_info['daily_limit']}, "
+                   f"Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
+        )
+
     try:
-        logger.debug(f"Processing text with Claude: {req.text[:100]}...")
+        logger.debug(f"[{user.github_username}] Processing text with Claude: {req.text[:100]}...")
         analysis = await fact_check_with_claude(req.text)
-        logger.debug(f"Claude analysis complete (length: {len(analysis)})")
-        logger.debug(f"Analysis preview: {analysis[:200]}...")
+        logger.debug(f"[{user.github_username}] Claude analysis complete (length: {len(analysis)})")
 
         if not analysis or len(analysis.strip()) == 0:
             logger.error("Claude returned empty analysis")
@@ -69,7 +329,7 @@ async def claude_fact_check(req: FactCheckRequest):
             analysis=analysis,
             post_text_preview=req.text[:100]
         )
-        logger.info(f"Returning response with analysis length: {len(response.analysis)}")
+        logger.info(f"[{user.github_username}] Returning response with analysis length: {len(response.analysis)}")
         return response
     except Exception as e:
         logger.error(f"Error in claude_fact_check: {type(e).__name__}: {e}", exc_info=True)
@@ -77,10 +337,26 @@ async def claude_fact_check(req: FactCheckRequest):
 
 
 @app.post("/ocr")
-async def extract_text_from_image(file: UploadFile = File(...)):
-    """Extract text from an image using OCR (Tesseract)"""
+async def extract_text_from_image(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Extract text from image using OCR (protected, rate-limited, costs 2 tokens)"""
+    # Check rate limit (OCR costs 2 tokens)
+    allowed, quota_info = rate_limiter.check_and_record_usage(
+        user, "/ocr", tokens_required=2, db=db
+    )
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Daily: {quota_info['daily_used']}/{quota_info['daily_limit']}, "
+                   f"Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
+        )
+
     try:
-        logger.debug(f"Extracting text from image: {file.filename}")
+        logger.debug(f"[{user.github_username}] Extracting text from image: {file.filename}")
 
         # Read the uploaded image
         contents = await file.read()
@@ -90,11 +366,10 @@ async def extract_text_from_image(file: UploadFile = File(...)):
         extracted_text = pytesseract.image_to_string(image)
 
         if not extracted_text or len(extracted_text.strip()) == 0:
-            logger.warning("OCR returned empty text")
+            logger.warning(f"[{user.github_username}] OCR returned empty text")
             raise Exception("No text found in the image")
 
-        logger.debug(f"OCR complete, extracted {len(extracted_text)} characters")
-        logger.debug(f"Text preview: {extracted_text[:100]}...")
+        logger.debug(f"[{user.github_username}] OCR complete, extracted {len(extracted_text)} characters")
 
         return {
             "text": extracted_text,
