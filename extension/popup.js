@@ -14,33 +14,50 @@ document.getElementById('imageUrl').addEventListener('paste', async (e) => {
   }
 });
 
-// Handle manual OCR from popup
-document.getElementById('ocrBtn').addEventListener('click', async () => {
-  const imageUrl = document.getElementById('imageUrl').value.trim();
-
-  if (!imageUrl && !clipboardImage) {
-    alert('Please paste an image URL or paste a screenshot (Ctrl+V)');
+// Ensure elements are available before attaching listeners
+function initializeButton() {
+  const btn = document.getElementById('ocrBtn');
+  if (!btn) {
+    console.error('OCR button not found');
+    setTimeout(initializeButton, 100);
     return;
   }
 
-  const btn = document.getElementById('ocrBtn');
-  const originalText = btn.textContent;
+  btn.addEventListener('click', async () => {
+    const imageUrl = document.getElementById('imageUrl').value.trim();
 
-  // Show loading animation
-  console.log('Showing loading animation');
-  const contentContainer = document.getElementById('contentContainer');
-  const loadingContainer = document.getElementById('loadingContainer');
+    if (!imageUrl && !clipboardImage) {
+      alert('Please paste an image URL or paste a screenshot (Ctrl+V)');
+      return;
+    }
 
-  console.log('Content container:', contentContainer);
-  console.log('Loading container:', loadingContainer);
+    const btn = document.getElementById('ocrBtn');
+    const originalText = btn.textContent;
 
-  contentContainer.style.display = 'none';
-  loadingContainer.classList.add('show');
+    // Show loading animation
+    console.log('Showing loading animation');
+    const contentContainer = document.getElementById('contentContainer');
+    const loadingContainer = document.getElementById('loadingContainer');
 
-  console.log('Loading container display:', loadingContainer.style.display);
-  console.log('Loading container classes:', loadingContainer.className);
+    console.log('Content container:', contentContainer);
+    console.log('Loading container:', loadingContainer);
 
-  btn.disabled = true;
+    if (!contentContainer) {
+      console.error('Content container not found!');
+      return;
+    }
+    if (!loadingContainer) {
+      console.error('Loading container not found!');
+      return;
+    }
+
+    contentContainer.style.display = 'none';
+    loadingContainer.classList.add('show');
+
+    console.log('Loading container display:', window.getComputedStyle(loadingContainer).display);
+    console.log('Loading container classes:', loadingContainer.className);
+
+    btn.disabled = true;
 
   try {
     // Get the active tab
@@ -121,4 +138,12 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
     document.getElementById('loadingContainer').classList.remove('show');
     btn.disabled = false;
   }
-});
+  });
+}
+
+// Initialize button when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeButton);
+} else {
+  initializeButton();
+}
