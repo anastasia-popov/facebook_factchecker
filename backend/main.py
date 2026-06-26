@@ -404,19 +404,7 @@ async def extract_text_from_image(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Extract text from image using OCR (protected, rate-limited, costs 2 tokens)"""
-    # Check rate limit (OCR costs 2 tokens)
-    allowed, quota_info = rate_limiter.check_and_record_usage(
-        user, "/ocr", tokens_required=2, db=db
-    )
-
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded. Daily: {quota_info['daily_used']}/{quota_info['daily_limit']}, "
-                   f"Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
-        )
-
+    """Extract text from image using OCR (protected, not rate-limited)"""
     try:
         logger.debug(f"[{user.google_email}] Extracting text from image: {file.filename}")
 
