@@ -602,11 +602,11 @@
       styleSheet.id = 'fc-keyframes';
       styleSheet.textContent = `
         @keyframes fc-magnify {
-          0% { transform: translate(0, -12px) rotate(0deg); }
-          25% { transform: translate(12px, -6px) rotate(90deg); }
-          50% { transform: translate(12px, 6px) rotate(180deg); }
-          75% { transform: translate(0, 12px) rotate(270deg); }
-          100% { transform: translate(0, -12px) rotate(360deg); }
+          0% { transform: translate(0, -14px) rotate(-15deg); }
+          25% { transform: translate(14px, 0) rotate(-15deg); }
+          50% { transform: translate(0, 14px) rotate(-15deg); }
+          75% { transform: translate(-14px, 0) rotate(-15deg); }
+          100% { transform: translate(0, -14px) rotate(-15deg); }
         }
       `;
       document.head.appendChild(styleSheet);
