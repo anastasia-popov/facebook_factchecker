@@ -1,10 +1,7 @@
 (function () {
   const BACKEND_URL = 'http://localhost:8000';
-  console.log('🔍 Fact Checker: Content script loaded');
-
 
   async function performOCR(imageUrl) {
-    console.log('Starting OCR on image:', imageUrl);
 
     let statusDiv;
 
@@ -31,9 +28,7 @@
       try {
         const response = await fetch(imageUrl);
         imageBlob = await response.blob();
-        console.log('Image downloaded, size:', imageBlob.size);
       } catch (e) {
-        console.log('Direct fetch failed, trying with no-cors...');
         const response = await fetch(imageUrl, { mode: 'no-cors' });
         imageBlob = await response.blob();
       }
@@ -60,16 +55,12 @@
         statusDiv.remove();
       }
 
-      console.log('OCR complete, extracted text length:', extractedText.length);
-      console.log('Extracted text preview:', extractedText.substring(0, 100));
-
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text found in the image');
       }
 
       return extractedText;
     } catch (error) {
-      console.error('OCR error:', error);
       if (statusDiv && statusDiv.parentNode) {
         statusDiv.remove();
       }
@@ -78,21 +69,17 @@
   }
 
   async function extractPostText(article) {
-    console.log('extractPostText called');
 
     if (!article) {
-      console.log('No article provided');
       return '';
     }
 
     try {
       // Wait for loading to complete (max 5 seconds)
-      console.log('Waiting for post to load...');
       let attempts = 0;
       while (attempts < 50) {
         const loadingElement = article.querySelector('[aria-label="Loading..."]');
         if (!loadingElement) {
-          console.log('Post loaded after', attempts * 100, 'ms');
           break;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -101,23 +88,15 @@
 
       // Debug: check article properties
       const articleStyles = getComputedStyle(article);
-      console.log('Article display:', articleStyles.display);
-      console.log('Article visibility:', articleStyles.visibility);
-      console.log('Article opacity:', articleStyles.opacity);
-      console.log('Article children count:', article.children.length);
-      console.log('Article HTML length:', article.innerHTML.length);
-      console.log('Article HTML (first 500):', article.innerHTML.substring(0, 500));
 
       // Find all post text paragraphs within the modal
       let text = '';
       const modal = document.querySelector('div[aria-modal="true"]');
 
       if (modal) {
-        console.log('✓ Found modal');
 
         // Extract text
         const postTextElements = modal.querySelectorAll('div[dir="auto"][style*="text-align: start"]');
-        console.log('Found', postTextElements.length, 'text elements');
 
         if (postTextElements.length > 0) {
           // Combine all text elements
@@ -126,15 +105,10 @@
           );
           text = textParts.filter(t => t.trim().length > 0).join('\n');
 
-          console.log('✓ Found post text elements in modal');
-          console.log('Post text length:', text.length);
-          console.log('Text preview:', text.substring(0, 300));
         } else {
-          console.log('✗ Post text elements not found in modal');
         }
 
       } else {
-        console.log('✗ Modal not found');
       }
 
       // Clean up the text - remove common FB UI elements
@@ -145,12 +119,9 @@
       });
 
       text = lines.join('\n').trim();
-      console.log('Cleaned text length:', text.length);
-      console.log('Cleaned text preview:', text.substring(0, 300));
 
       return text.slice(0, 2000);
     } catch (e) {
-      console.error('Error extracting text:', e);
       return '';
     }
   }
@@ -162,7 +133,6 @@
 
   function parseTextWithLinks(text) {
     if (!text || typeof text !== 'string') {
-      console.error('parseTextWithLinks received invalid text:', text);
       return escapeHtml(String(text));
     }
 
@@ -180,11 +150,8 @@
   }
 
   function showClaudeResults(container, responseText, originalText) {
-    console.log('showClaudeResults called with text length:', responseText?.length);
-    console.log('Response text preview:', responseText?.substring(0, 100));
 
     if (!responseText || responseText.trim() === '') {
-      console.error('Empty response text received');
       showError(container, 'Received empty analysis from backend');
       return;
     }
@@ -220,8 +187,6 @@
       .replace(/^##\s+(.+)$/gm, '<h3 style="margin: 12px 0 6px 0 !important; font-size: 15px !important; font-weight: 600 !important;">$1</h3>')
       .replace(/^\*\*(.+?)\*\*:/gm, '<strong style="color: #1877f2 !important;">$1:</strong>');
 
-    console.log('Formatted HTML length:', responseHtml.length);
-
     const originalTextHtml = originalText ? `
       <div style="background: #f0f2f5 !important; padding: 12px !important; margin-bottom: 12px !important; border-left: 4px solid #1877f2 !important; border-radius: 4px !important;">
         <div style="font-weight: 600 !important; font-size: 12px !important; color: #1877f2 !important; margin-bottom: 6px !important;">📝 Original Text:</div>
@@ -244,12 +209,10 @@
 
     const closeBtn = overlay.querySelector('.fc-close');
     closeBtn.addEventListener('click', () => {
-      console.log('Closing overlay');
       overlay.remove();
     });
 
     document.body.appendChild(overlay);
-    console.log('Overlay appended to body with fixed positioning');
   }
 
   function showError(container, message) {
@@ -285,12 +248,10 @@
   }
 
   async function handleFactCheck(article, btn) {
-    console.log('handleFactCheck called');
     btn.disabled = true;
     btn.textContent = 'Checking…';
 
     const text = await extractPostText(article);
-    console.log('Post text:', text.length, 'chars');
 
     if (!text.trim()) {
       showError(article, 'Could not extract text from post.');
@@ -307,8 +268,6 @@
         .map(img => img.src || img.getAttribute('data-src'))
         .filter(url => url && url.length > 10);
 
-      console.log('Sending fact-check request to background service worker');
-
       // Send message to background service worker to handle Claude API call
       chrome.runtime.sendMessage(
         {
@@ -317,19 +276,14 @@
           imageUrls: imageUrls
         },
         (response) => {
-          console.log('Response from background:', response);
 
           if (!response) {
-            console.error('No response from background');
             showError(article, 'No response from service worker');
           } else if (response.error) {
-            console.error('Backend error:', response.error);
             showError(article, response.error);
           } else if (response.result) {
-            console.log('Showing Claude results, length:', response.result.length);
             showClaudeResults(article, response.result, text);
           } else {
-            console.error('Unexpected response structure:', response);
             showError(article, 'Unexpected response from backend');
           }
 
@@ -338,7 +292,6 @@
         }
       );
     } catch (e) {
-      console.error('Error:', e);
       showError(article, `Error: ${e.message}`);
       btn.disabled = false;
       btn.textContent = '🔍 Fact Check';
@@ -403,43 +356,35 @@
     try {
       if (request.action === 'factCheckText') {
       const selectedText = request.text;
-      console.log('Fact-checking selected text:', selectedText.substring(0, 100));
       performFactCheck(selectedText, document.body);
     } else if (request.action === 'factCheckImage') {
       const imageUrl = request.imageUrl;
-      console.log('Extracting text from image:', imageUrl);
 
       performOCR(imageUrl)
         .then(extractedText => {
           if (extractedText && extractedText.trim().length > 0) {
-            console.log('OCR successful, performing fact-check on extracted text');
             performFactCheck(extractedText, document.body);
           } else {
             showError(document.body, 'No text found in the image. Please try another image.');
           }
         })
         .catch(error => {
-          console.error('OCR failed:', error);
           showError(document.body, `OCR Error: ${error.message}`);
         });
     } else if (request.action === 'findImageForOCR') {
       // Try to get image from the last clicked element (handles divs with background images too)
-      console.log('Finding image for OCR from page...');
       const imageUrl = extractImageUrl(lastClickedElement);
-      console.log('Extracted image URL:', imageUrl);
 
       if (imageUrl) {
         performOCR(imageUrl)
           .then(extractedText => {
             if (extractedText && extractedText.trim().length > 0) {
-              console.log('OCR successful from fallback');
               performFactCheck(extractedText, document.body);
             } else {
               showError(document.body, 'No text found in the image. Please try another image.');
             }
           })
           .catch(error => {
-            console.error('OCR failed:', error);
             showError(document.body, `OCR Error: ${error.message}`);
           });
       } else {
@@ -447,7 +392,6 @@
       }
     }
     } catch (error) {
-      console.error('Message handler error:', error);
       sendResponse({ error: error.message });
     }
   });
@@ -472,7 +416,6 @@
 
     try {
       // Send to background service worker
-      console.log('Sending message to background service worker');
       chrome.runtime.sendMessage(
         {
           action: 'factCheckWithClaude',
@@ -480,7 +423,6 @@
           imageUrls: []
         },
         (response) => {
-          console.log('Got response from background:', response);
           statusDiv.remove();
 
           if (!response) {
@@ -496,7 +438,6 @@
         }
       );
     } catch (e) {
-      console.error('Error sending message:', e);
       statusDiv.remove();
       showError(container, `Error: ${e.message}`);
     }
