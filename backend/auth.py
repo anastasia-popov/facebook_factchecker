@@ -98,6 +98,72 @@ class OAuth2Manager:
         return response.json()
 
 
+class GoogleOAuth2Manager:
+    """Manage OAuth 2.0 flow with Google"""
+
+    def __init__(self):
+        self.client_id = settings.google_oauth_client_id
+        self.client_secret = settings.google_oauth_client_secret
+        self.authorize_url = "https://accounts.google.com/o/oauth2/v2/auth"
+        self.token_url = "https://oauth2.googleapis.com/token"
+        self.user_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+    def generate_state(self) -> str:
+        """Generate random state parameter for CSRF protection"""
+        return secrets.token_urlsafe(32)
+
+    def get_authorization_url(self, state: str) -> str:
+        """Get Google authorization URL"""
+        params = {
+            'client_id': self.client_id,
+            'redirect_uri': f'{settings.backend_url}/auth/google/callback',
+            'scope': 'openid email profile',
+            'response_type': 'code',
+            'state': state
+        }
+
+        query_string = '&'.join(f'{k}={v}' for k, v in params.items())
+        return f'{self.authorize_url}?{query_string}'
+
+    async def exchange_code_for_token(self, code: str) -> Dict:
+        """Exchange authorization code for Google access token"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.token_url,
+                data={
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
+                    'code': code,
+                    'grant_type': 'authorization_code',
+                    'redirect_uri': f'{settings.backend_url}/auth/google/callback',
+                }
+            )
+
+        if response.status_code != 200:
+            logger.error(f"Google token exchange failed: {response.text}")
+            raise Exception("Failed to exchange authorization code for token")
+
+        data = response.json()
+        if 'error' in data:
+            raise Exception(f"OAuth error: {data.get('error_description', 'Unknown error')}")
+
+        return data
+
+    async def get_user_info(self, access_token: str) -> Dict:
+        """Get authenticated user info from Google"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                self.user_url,
+                headers={'Authorization': f'Bearer {access_token}'}
+            )
+
+        if response.status_code != 200:
+            logger.error(f"Failed to get user info: {response.text}")
+            raise Exception("Failed to get user info from Google")
+
+        return response.json()
+
+
 class JWTManager:
     """Manage JWT token generation and validation"""
 
@@ -202,6 +268,54 @@ class UserManager:
         return db.query(User).filter(User.github_id == github_id).first()
 
     @staticmethod
+    def get_user_by_google_id(google_id: str, db: SessionLocal) -> Optional[User]:
+        """Get user by Google ID"""
+        return db.query(User).filter(User.google_id == google_id).first()
+
+    @staticmethod
+    def create_or_update_google_user(
+        google_id: str,
+        google_email: str,
+        display_name: str,
+        google_access_token: str,
+        jwt_refresh_token: str,
+        db: SessionLocal
+    ) -> User:
+        """Create or update user from Google OAuth response"""
+        user = db.query(User).filter(User.google_id == google_id).first()
+
+        refresh_token_expiry = datetime.utcnow() + timedelta(
+            days=settings.refresh_token_expiration_days
+        )
+
+        if user:
+            # Update existing user
+            user.google_access_token = google_access_token
+            user.google_email = google_email
+            user.display_name = display_name
+            user.jwt_refresh_token = jwt_refresh_token
+            user.jwt_refresh_token_expiry = refresh_token_expiry
+            user.last_login = datetime.utcnow()
+            user.active = True
+        else:
+            # Create new user
+            user = User(
+                google_id=google_id,
+                google_email=google_email,
+                display_name=display_name,
+                google_access_token=google_access_token,
+                jwt_refresh_token=jwt_refresh_token,
+                jwt_refresh_token_expiry=refresh_token_expiry,
+                last_login=datetime.utcnow(),
+                active=True
+            )
+            db.add(user)
+
+        db.commit()
+        db.refresh(user)
+        return user
+
+    @staticmethod
     def validate_refresh_token(user: User, refresh_token: str) -> bool:
         """Validate refresh token for a user"""
         if user.jwt_refresh_token != refresh_token:
@@ -233,4 +347,5 @@ class UserManager:
 
 # Initialize managers
 oauth_manager = OAuth2Manager()
+google_oauth_manager = GoogleOAuth2Manager()
 jwt_manager = JWTManager()

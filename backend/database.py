@@ -20,10 +20,21 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    github_id = Column(Integer, unique=True, nullable=False, index=True)
-    github_username = Column(String(255), unique=True, nullable=False, index=True)
-    github_access_token = Column(String(1000), nullable=False)
+
+    # GitHub OAuth
+    github_id = Column(Integer, unique=True, nullable=True, index=True)
+    github_username = Column(String(255), unique=True, nullable=True, index=True)
+    github_access_token = Column(String(1000), nullable=True)
     github_token_expiry = Column(DateTime, nullable=True)
+
+    # Google OAuth
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    google_email = Column(String(255), unique=True, nullable=True, index=True)
+    google_access_token = Column(String(1000), nullable=True)
+    google_token_expiry = Column(DateTime, nullable=True)
+
+    # Display name (from provider)
+    display_name = Column(String(255), nullable=True)
 
     jwt_refresh_token = Column(String(500), unique=True, nullable=False, index=True)
     jwt_refresh_token_expiry = Column(DateTime, nullable=False)
@@ -38,7 +49,8 @@ class User(Base):
     active = Column(Boolean, default=True, nullable=False)
 
     def __repr__(self):
-        return f"<User(github_username={self.github_username})>"
+        username = self.github_username or self.google_email
+        return f"<User({username})>"
 
 
 class UsageTracking(Base):

@@ -9,7 +9,7 @@ from checker import run_fact_check
 from claude_checker import fact_check_with_claude
 from config import settings
 from database import init_db, get_db, User
-from auth import oauth_manager, jwt_manager, UserManager
+from auth import oauth_manager, google_oauth_manager, jwt_manager, UserManager
 from rate_limit import rate_limiter
 from schemas import (
     OAuthStartResponse, OAuthCallbackRequest, TokenResponse, RefreshTokenRequest,
@@ -134,6 +134,69 @@ async def oauth_callback(
         )
     except Exception as e:
         logger.error(f"Error in oauth_callback: {e}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+
+# ==================== Google OAuth Endpoints ====================
+
+@app.post("/auth/google/start-oauth", response_model=OAuthStartResponse)
+async def start_google_oauth():
+    """Initiate OAuth flow with Google"""
+    try:
+        # Generate state for CSRF protection
+        state = google_oauth_manager.generate_state()
+
+        # Get authorization URL
+        oauth_url = google_oauth_manager.get_authorization_url(state)
+
+        logger.info("Google OAuth flow initiated")
+
+        return OAuthStartResponse(
+            oauth_url=oauth_url,
+            state=state,
+            code_challenge=""  # Google doesn't use PKCE, return empty string
+        )
+    except Exception as e:
+        logger.error(f"Error in start_google_oauth: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to start OAuth flow")
+
+
+@app.post("/auth/google/callback", response_model=TokenResponse)
+async def google_oauth_callback(
+    req: OAuthCallbackRequest,
+    db: Session = Depends(get_db)
+):
+    """Handle Google OAuth callback and exchange code for tokens"""
+    try:
+        # Exchange authorization code for Google token
+        google_token_data = await google_oauth_manager.exchange_code_for_token(req.code)
+
+        # Get user info from Google
+        user_info = await google_oauth_manager.get_user_info(google_token_data['access_token'])
+
+        # Create or update user
+        refresh_token = jwt_manager.create_refresh_token()
+        user = UserManager.create_or_update_google_user(
+            google_id=user_info['id'],
+            google_email=user_info['email'],
+            display_name=user_info.get('name', user_info['email']),
+            google_access_token=google_token_data['access_token'],
+            jwt_refresh_token=refresh_token,
+            db=db
+        )
+
+        # Create access token
+        access_token = jwt_manager.create_access_token(user.id, user_info['email'])
+
+        logger.info(f"User authenticated via Google: {user_info['email']}")
+
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.jwt_expiration_minutes * 60
+        )
+    except Exception as e:
+        logger.error(f"Error in google_oauth_callback: {e}", exc_info=True)
         raise HTTPException(status_code=401, detail="Authentication failed")
 
 
