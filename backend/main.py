@@ -2,6 +2,7 @@ import logging
 import io
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
@@ -98,15 +99,16 @@ async def start_google_oauth():
         raise HTTPException(status_code=500, detail="Failed to start OAuth flow")
 
 
-@app.post("/auth/google/callback", response_model=TokenResponse)
+@app.get("/auth/google/callback")
 async def google_oauth_callback(
-    req: OAuthCallbackRequest,
+    code: str,
+    state: str,
     db: Session = Depends(get_db)
 ):
-    """Handle Google OAuth callback and exchange code for tokens"""
+    """Handle Google OAuth callback (GET request from Google)"""
     try:
         # Exchange authorization code for Google token
-        google_token_data = await google_oauth_manager.exchange_code_for_token(req.code)
+        google_token_data = await google_oauth_manager.exchange_code_for_token(code)
 
         # Get user info from Google
         user_info = await google_oauth_manager.get_user_info(google_token_data['access_token'])
@@ -127,14 +129,50 @@ async def google_oauth_callback(
 
         logger.info(f"User authenticated via Google: {user_info['email']}")
 
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_in=settings.jwt_expiration_minutes * 60
-        )
+        # Return HTML page that posts tokens to popup and closes window
+        html_content = f"""
+        <html>
+        <head><title>Authentication Successful</title></head>
+        <body>
+            <script>
+                // Send tokens to popup with window.opener.postMessage
+                window.opener.postMessage({{
+                    action: 'oauthCallback',
+                    accessToken: '{access_token}',
+                    refreshToken: '{refresh_token}',
+                    success: true
+                }}, '*');
+
+                // Close this window
+                window.close();
+            </script>
+            <p>Authentication successful. This window should close automatically.</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
     except Exception as e:
         logger.error(f"Error in google_oauth_callback: {e}", exc_info=True)
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        html_content = f"""
+        <html>
+        <head><title>Authentication Failed</title></head>
+        <body>
+            <script>
+                // Send error to popup
+                window.opener.postMessage({{
+                    action: 'oauthCallback',
+                    success: false,
+                    error: '{str(e)}'
+                }}, '*');
+
+                // Close this window
+                window.close();
+            </script>
+            <p>Authentication failed: {str(e)}</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content, status_code=401)
 
 
 @app.post("/auth/refresh", response_model=TokenResponse)
