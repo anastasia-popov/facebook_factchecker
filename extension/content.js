@@ -633,8 +633,8 @@
     `;
 
     overlay.innerHTML = `
-      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 60px; height: 60px; object-fit: contain;">
-      <div style="font-weight: 500; color: #0891B2;">Fact-checking...</div>
+      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 140px; height: 140px; object-fit: contain; flex: 1;">
+      <div style="font-weight: 500; color: #0891B2; flex-shrink: 0;">Fact-checking...</div>
     `;
 
     document.body.appendChild(overlay);
