@@ -136,4 +136,4 @@ class RateLimiter:
 
 
 # Initialize rate limiter
-rate_limiter = RateLimiter(daily_quota=200, monthly_quota=5000)
+rate_limiter = RateLimiter(monthly_quota=5000)
