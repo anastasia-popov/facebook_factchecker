@@ -27,8 +27,19 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
   const originalText = btn.textContent;
 
   // Show loading animation
-  document.getElementById('contentContainer').style.display = 'none';
-  document.getElementById('loadingContainer').classList.add('show');
+  console.log('Showing loading animation');
+  const contentContainer = document.getElementById('contentContainer');
+  const loadingContainer = document.getElementById('loadingContainer');
+
+  console.log('Content container:', contentContainer);
+  console.log('Loading container:', loadingContainer);
+
+  contentContainer.style.display = 'none';
+  loadingContainer.classList.add('show');
+
+  console.log('Loading container display:', loadingContainer.style.display);
+  console.log('Loading container classes:', loadingContainer.className);
+
   btn.disabled = true;
 
   try {
@@ -57,12 +68,15 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
 
         if (extractedText && extractedText.trim().length > 0) {
           // Send to content script for fact-checking
+          console.log('Sending fact-check message with extracted text');
           chrome.tabs.sendMessage(tab.id, {
             action: 'factCheckText',
             text: extractedText
+          }, (response) => {
+            console.log('Fact-check initiated, closing popup');
+            clipboardImage = null;
+            setTimeout(() => window.close(), 500);
           });
-          clipboardImage = null;
-          window.close();
         } else {
           alert('No text found in the image');
           document.getElementById('contentContainer').style.display = 'block';
@@ -96,7 +110,8 @@ document.getElementById('ocrBtn').addEventListener('click', async () => {
           document.getElementById('loadingContainer').classList.remove('show');
           btn.disabled = false;
         } else {
-          window.close();
+          console.log('Fact-check initiated, closing popup');
+          setTimeout(() => window.close(), 500);
         }
       });
     }
