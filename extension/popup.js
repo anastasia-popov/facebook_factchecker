@@ -1,3 +1,4 @@
+console.log('🔍 Fact Checker popup.js loaded');
 
 // Handle clipboard paste for images
 let clipboardImage = null;
