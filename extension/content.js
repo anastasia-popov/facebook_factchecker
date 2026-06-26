@@ -589,7 +589,7 @@
       font-size: 14px !important;
       color: #374151 !important;
       z-index: 999999 !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
       max-width: 320px !important;
       display: flex !important;
       flex-direction: column !important;
@@ -597,34 +597,28 @@
       gap: 20px !important;
     `;
 
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = `
-      @keyframes fc-magnify {
-        0% { transform: rotate(0deg) scale(1); }
-        50% { transform: rotate(25deg) scale(1.05); }
-        100% { transform: rotate(0deg) scale(1); }
-      }
-      @keyframes fc-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-      }
-      .fc-loading-icon {
-        font-size: 48px !important;
-        animation: fc-magnify 2s ease-in-out infinite !important;
-        display: inline-block !important;
-      }
-      .fc-loading-text {
-        font-weight: 500 !important;
-        color: #0891B2 !important;
-        animation: fc-pulse 1.5s ease-in-out infinite !important;
-      }
-    `;
-    document.head.appendChild(styleSheet);
-
     overlay.innerHTML = `
-      <div class="fc-loading-icon">🔍</div>
-      <div class="fc-loading-text">Searching and analyzing…</div>
+      <div style="font-size: 48px; display: inline-block; animation: fc-magnify 2s ease-in-out infinite;">🔍</div>
+      <div style="font-weight: 500; color: #0891B2; animation: fc-pulse 1.5s ease-in-out infinite;">Searching and analyzing…</div>
     `;
+
+    // Add keyframes if not already added
+    if (!document.getElementById('fc-keyframes')) {
+      const styleSheet = document.createElement('style');
+      styleSheet.id = 'fc-keyframes';
+      styleSheet.textContent = `
+        @keyframes fc-magnify {
+          0% { transform: rotate(0deg) scale(1); }
+          50% { transform: rotate(25deg) scale(1.05); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        @keyframes fc-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
 
     document.body.appendChild(overlay);
     return overlay;
