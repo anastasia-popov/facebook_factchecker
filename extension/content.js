@@ -636,7 +636,32 @@
 
     overlay.innerHTML = `
       <div style="width: 100%; height: 85%; flex: 1;">
-        <img src="${chrome.runtime.getURL('loader.svg')}" style="width: 100%; height: 100%; object-fit: contain;">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+          <defs>
+            <filter height="140%" id="glass-shadow" width="140%" x="-20%" y="-20%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="2"></feGaussianBlur>
+              <feOffset dx="1" dy="1" result="offsetblur"></feOffset>
+              <feComponentTransfer>
+                <feFuncA slope="0.3" type="linear"></feFuncA>
+              </feComponentTransfer>
+              <feMerge>
+                <feMergeNode></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+              </feMerge>
+            </filter>
+          </defs>
+          <g filter="url(#glass-shadow)">
+            <g>
+              <animateMotion dur="4s" path="M 50,35 A 15,15 0 1 1 49.99,35 Z" repeatCount="indefinite"></animateMotion>
+              <g transform="rotate(-45)">
+                <rect fill="#0a6b8a" height="25" rx="1" width="6" x="-3" y="15"></rect>
+                <circle cx="0" cy="0" fill="none" r="18" stroke="#0a6b8a" stroke-width="6"></circle>
+                <circle cx="0" cy="0" fill="rgba(8, 145, 178, 0.15)" r="16"></circle>
+                <path d="M-8 -8 Q -4 -12 0 -8" fill="none" opacity="0.6" stroke="white" stroke-linecap="round" stroke-width="1.5"></path>
+              </g>
+            </g>
+          </g>
+        </svg>
       </div>
       <div style="font-weight: 500; color: #0891B2; flex-shrink: 0; padding: 16px; width: 100%; text-align: center; box-sizing: border-box;">Fact-checking...</div>
     `;
