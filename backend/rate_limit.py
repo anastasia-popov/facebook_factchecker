@@ -92,13 +92,13 @@ class RateLimiter:
             db.commit()
 
             logger.info(
-                f"User {user.github_username} made request to {endpoint} "
+                f"User {user.google_email} made request to {endpoint} "
                 f"(daily: {bucket.requests_today}/{self.daily_quota}, "
                 f"monthly: {bucket.requests_this_month}/{self.monthly_quota})"
             )
         else:
             logger.warning(
-                f"User {user.github_username} exceeded rate limit on {endpoint} "
+                f"User {user.google_email} exceeded rate limit on {endpoint} "
                 f"(daily: {bucket.requests_today}/{self.daily_quota}, "
                 f"monthly: {bucket.requests_this_month}/{self.monthly_quota})"
             )
