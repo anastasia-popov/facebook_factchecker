@@ -467,17 +467,22 @@
       return escapeHtml(String(text));
     }
 
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
+    let html = escapeHtml(text);
 
-    return parts.map((part, idx) => {
-      if (part && part.match(urlRegex)) {
-        // Remove trailing punctuation if present
-        const cleanUrl = part.replace(/[.,;:!?)]$/, '');
-        return `<a href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener noreferrer" style="color: #1877f2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
-      }
-      return part ? escapeHtml(part) : '';
-    }).join('');
+    // Handle markdown-style links: [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0891B2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${linkText}</a>`;
+    });
+
+    // Handle plain URLs
+    const urlRegex = /(https?:\/\/[^\s<]+)/g;
+    html = html.replace(urlRegex, (url) => {
+      // Remove trailing punctuation if present
+      const cleanUrl = url.replace(/[.,;:!?)]$/, '');
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" style="color: #0891B2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
+    });
+
+    return html;
   }
 
   function markdownToHtml(text) {
