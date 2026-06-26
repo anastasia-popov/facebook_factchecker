@@ -485,16 +485,41 @@
       document.head.appendChild(styleSheet);
     }
 
-    let html = escapeHtml(text);
+    // Process markdown-style links BEFORE escaping
+    // Split by markdown links to handle them separately
+    const parts = [];
+    const markdownRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let lastIndex = 0;
+    let match;
 
-    // Handle markdown-style links: [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="fc-link">${linkText}</a>`;
-    });
+    while ((match = markdownRegex.exec(text)) !== null) {
+      // Add text before the link (escaped)
+      if (match.index > lastIndex) {
+        parts.push(escapeHtml(text.substring(lastIndex, match.index)));
+      }
 
-    // Handle plain URLs
+      // Add the link
+      const linkText = match[1];
+      const url = match[2];
+      parts.push(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(linkText)}</a>`);
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text (escaped)
+    if (lastIndex < text.length) {
+      parts.push(escapeHtml(text.substring(lastIndex)));
+    }
+
+    let html = parts.length > 0 ? parts.join('') : escapeHtml(text);
+
+    // Handle plain URLs (but not URLs that are already in links)
     const urlRegex = /(https?:\/\/[^\s<]+)/g;
     html = html.replace(urlRegex, (url) => {
+      // Skip if this is already part of an <a> tag
+      if (url.includes('class="fc-link"') || url.includes('target="_blank"')) {
+        return url;
+      }
+
       // Remove trailing punctuation if present
       const cleanUrl = url.replace(/[.,;:!?)]$/, '');
       return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(cleanUrl)}</a>`;
