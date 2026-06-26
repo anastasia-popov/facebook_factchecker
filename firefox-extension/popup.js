@@ -71,9 +71,6 @@ async function handleLogin() {
       code_verifier: code_challenge
     });
 
-    // Set up window message listener BEFORE opening OAuth window
-    window.addEventListener('message', handleOAuthMessage);
-
     // Open OAuth popup window
     chrome.windows.create({
       url: oauth_url,
@@ -81,40 +78,37 @@ async function handleLogin() {
       width: 500,
       height: 600
     });
+
+    // Poll for tokens every 500ms for up to 60 seconds
+    let attempts = 0;
+    const pollInterval = setInterval(async () => {
+      attempts++;
+
+      try {
+        const tokens = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
+
+        if (tokens.ok) {
+          clearInterval(pollInterval);
+          const { access_token, refresh_token } = await tokens.json();
+          handleOAuthSuccess(access_token, refresh_token);
+        } else if (attempts > 120) {
+          // 120 attempts * 500ms = 60 seconds timeout
+          clearInterval(pollInterval);
+          throw new Error('Authentication timeout. Please try again.');
+        }
+      } catch (error) {
+        if (attempts > 120) {
+          clearInterval(pollInterval);
+          handleOAuthError(error.message);
+        }
+      }
+    }, 500);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
     googleBtn.disabled = false;
   }
 }
 
-function handleOAuthMessage(event) {
-  // Accept messages from localhost (our backend callback page)
-  if (!event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) {
-    return;
-  }
-
-  if (event.data && event.data.action === 'oauthCallback') {
-    // OAuth callback window sent us the state parameter
-    // Now fetch the tokens from the backend
-    retrieveOAuthTokens(event.data.state);
-  }
-}
-
-async function retrieveOAuthTokens(state) {
-  try {
-    const response = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to retrieve tokens');
-    }
-
-    const { access_token, refresh_token } = await response.json();
-    handleOAuthSuccess(access_token, refresh_token);
-  } catch (error) {
-    handleOAuthError(error.message);
-  }
-}
 
 async function handleOAuthSuccess(accessToken, refreshToken) {
   const googleBtn = document.getElementById('googleLoginBtn');
