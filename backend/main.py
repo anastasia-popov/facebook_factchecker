@@ -2,7 +2,8 @@ import logging
 import io
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer
+from fastapi.security.http import HTTPAuthCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
