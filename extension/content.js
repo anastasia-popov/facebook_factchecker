@@ -467,11 +467,29 @@
       return escapeHtml(String(text));
     }
 
+    // Add link CSS if not already added
+    if (!document.getElementById('fc-link-styles')) {
+      const styleSheet = document.createElement('style');
+      styleSheet.id = 'fc-link-styles';
+      styleSheet.textContent = `
+        a.fc-link {
+          color: #0891B2 !important;
+          text-decoration: none !important;
+          font-weight: 500 !important;
+          transition: text-decoration 0.2s !important;
+        }
+        a.fc-link:hover {
+          text-decoration: underline !important;
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+
     let html = escapeHtml(text);
 
     // Handle markdown-style links: [text](url)
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0891B2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${linkText}</a>`;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="fc-link">${linkText}</a>`;
     });
 
     // Handle plain URLs
@@ -479,7 +497,7 @@
     html = html.replace(urlRegex, (url) => {
       // Remove trailing punctuation if present
       const cleanUrl = url.replace(/[.,;:!?)]$/, '');
-      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" style="color: #0891B2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(cleanUrl)}</a>`;
     });
 
     return html;
@@ -553,7 +571,7 @@
     overlay.innerHTML = `
       <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #0891B2 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F0F9FB 0%, #F5FEFB 100%) !important;">
         <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #0891B2 !important;">✓ Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #9CA3AF !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9CA3AF'">✕</button>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #9CA3AF !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
       </div>
       <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
         ${originalTextHtml}
@@ -565,6 +583,12 @@
     closeBtn.addEventListener('click', () => {
       console.log('Closing overlay');
       overlay.remove();
+    });
+    closeBtn.addEventListener('mouseover', () => {
+      closeBtn.style.color = '#374151 !important';
+    });
+    closeBtn.addEventListener('mouseout', () => {
+      closeBtn.style.color = '#9CA3AF !important';
     });
 
     document.body.appendChild(overlay);
@@ -657,9 +681,16 @@
     overlay.innerHTML = `
       <span class="fc-error-icon" style="font-size: 20px !important; flex-shrink: 0 !important;">⚠️</span>
       <span style="flex: 1 !important;">${escapeHtml(message)}</span>
-      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #D97706 !important; padding: 0 !important; transition: color 0.2s !important;" onmouseover="this.style.color='#7F1D1D'" onmouseout="this.style.color='#D97706'">✕</button>
+      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #D97706 !important; padding: 0 !important; transition: color 0.2s !important;">✕</button>
     `;
-    overlay.querySelector('.fc-close').addEventListener('click', () => overlay.remove());
+    const errorCloseBtn = overlay.querySelector('.fc-close');
+    errorCloseBtn.addEventListener('click', () => overlay.remove());
+    errorCloseBtn.addEventListener('mouseover', () => {
+      errorCloseBtn.style.color = '#7F1D1D !important';
+    });
+    errorCloseBtn.addEventListener('mouseout', () => {
+      errorCloseBtn.style.color = '#D97706 !important';
+    });
     document.body.appendChild(overlay);
   }
 
