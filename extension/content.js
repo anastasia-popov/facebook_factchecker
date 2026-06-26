@@ -480,6 +480,20 @@
     }).join('');
   }
 
+  function markdownToHtml(text) {
+    let html = parseTextWithLinks(text);
+
+    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #050505 !important;">$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #050505 !important;">$1</h2>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #050505 !important;">$1</h1>');
+
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #050505 !important; font-weight: 700 !important;">$1</strong>');
+
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+  }
+
   function showClaudeResults(container, responseText, originalText) {
     console.log('showClaudeResults called with text length:', responseText?.length);
     console.log('Response text preview:', responseText?.substring(0, 100));
@@ -516,10 +530,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     `;
 
-    const responseHtml = parseTextWithLinks(responseText)
-      .replace(/\n/g, '<br>')
-      .replace(/^##\s+(.+)$/gm, '<h3 style="margin: 12px 0 6px 0 !important; font-size: 15px !important; font-weight: 600 !important;">$1</h3>')
-      .replace(/^\*\*(.+?)\*\*:/gm, '<strong style="color: #1877f2 !important;">$1:</strong>');
+    const responseHtml = markdownToHtml(responseText);
 
     console.log('Formatted HTML length:', responseHtml.length);
 
