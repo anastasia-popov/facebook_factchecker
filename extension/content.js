@@ -485,7 +485,7 @@
       document.head.appendChild(styleSheet);
     }
 
-    // Process markdown-style links BEFORE escaping
+    // Process markdown-style links ONLY
     // Split by markdown links to handle them separately
     const parts = [];
     const markdownRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
@@ -510,22 +510,8 @@
       parts.push(escapeHtml(text.substring(lastIndex)));
     }
 
-    let html = parts.length > 0 ? parts.join('') : escapeHtml(text);
-
-    // Handle plain URLs (but not URLs that are already in links)
-    const urlRegex = /(https?:\/\/[^\s<]+)/g;
-    html = html.replace(urlRegex, (url) => {
-      // Skip if this is already part of an <a> tag
-      if (url.includes('class="fc-link"') || url.includes('target="_blank"')) {
-        return url;
-      }
-
-      // Remove trailing punctuation if present
-      const cleanUrl = url.replace(/[.,;:!?)]$/, '');
-      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(cleanUrl)}</a>`;
-    });
-
-    return html;
+    // Return processed HTML (or just escaped text if no markdown links found)
+    return parts.length > 0 ? parts.join('') : escapeHtml(text);
   }
 
   function markdownToHtml(text) {
