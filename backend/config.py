@@ -8,10 +8,6 @@ class Settings(BaseSettings):
     claude_api_key: str = ""
     serper_api_key: str = ""
 
-    # OAuth Settings - GitHub
-    github_oauth_client_id: str = ""
-    github_oauth_client_secret: str = ""
-
     # OAuth Settings - Google
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""

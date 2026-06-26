@@ -31,9 +31,8 @@ function showProfilePanel() {
 }
 
 function setupEventListeners() {
-  // Login buttons
-  document.getElementById('githubLoginBtn').addEventListener('click', () => handleLogin('github'));
-  document.getElementById('googleLoginBtn').addEventListener('click', () => handleLogin('google'));
+  // Login button
+  document.getElementById('googleLoginBtn').addEventListener('click', handleLogin);
 
   // Logout button
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
@@ -47,19 +46,16 @@ function setupEventListeners() {
 
 // ==================== OAuth Login ====================
 
-async function handleLogin(provider) {
-  const githubBtn = document.getElementById('githubLoginBtn');
+async function handleLogin() {
   const googleBtn = document.getElementById('googleLoginBtn');
   const errorDiv = document.getElementById('loginError');
 
-  githubBtn.disabled = true;
   googleBtn.disabled = true;
   errorDiv.style.display = 'none';
 
   try {
     // Get OAuth URL from backend
-    const endpoint = provider === 'google' ? '/auth/google/start-oauth' : '/auth/start-oauth';
-    const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+    const response = await fetch(`${BACKEND_URL}/auth/google/start-oauth`, {
       method: 'POST'
     });
 
@@ -69,11 +65,10 @@ async function handleLogin(provider) {
 
     const { oauth_url, state, code_challenge } = await response.json();
 
-    // Store state, code_verifier, and provider for callback validation
+    // Store state and code_verifier for callback validation
     await chrome.storage.local.set({
       oauth_state: state,
-      code_verifier: code_challenge,
-      oauth_provider: provider
+      code_verifier: code_challenge
     });
 
     // Open OAuth popup window
@@ -88,7 +83,6 @@ async function handleLogin(provider) {
     chrome.runtime.onMessage.addListener(handleOAuthMessage);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
-    githubBtn.disabled = false;
     googleBtn.disabled = false;
   }
 }
@@ -100,23 +94,19 @@ function handleOAuthMessage(request, sender, sendResponse) {
 }
 
 async function handleOAuthCallback(code, state) {
-  const githubBtn = document.getElementById('githubLoginBtn');
   const googleBtn = document.getElementById('googleLoginBtn');
   const errorDiv = document.getElementById('loginError');
 
   try {
-    const auth = await chrome.storage.local.get(['oauth_state', 'code_verifier', 'oauth_provider']);
+    const auth = await chrome.storage.local.get(['oauth_state', 'code_verifier']);
 
     // Validate state
     if (auth.oauth_state !== state) {
       throw new Error('Invalid state parameter - possible CSRF attack');
     }
 
-    const provider = auth.oauth_provider || 'github';
-    const endpoint = provider === 'google' ? '/auth/google/callback' : '/auth/callback';
-
     // Exchange code for tokens
-    const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+    const response = await fetch(`${BACKEND_URL}/auth/google/callback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -140,8 +130,7 @@ async function handleOAuthCallback(code, state) {
         refreshToken: refresh_token,
         accessTokenExpiry: Date.now() + (60 * 60 * 1000), // 1 hour
         isAuthenticated: true,
-        lastRefresh: Date.now(),
-        provider: provider
+        lastRefresh: Date.now()
       }
     });
 
@@ -150,7 +139,6 @@ async function handleOAuthCallback(code, state) {
     await loadUserProfile();
   } catch (error) {
     showLoginError('Authentication failed: ' + error.message);
-    githubBtn.disabled = false;
     googleBtn.disabled = false;
   }
 }
