@@ -2,148 +2,6 @@
   const BACKEND_URL = 'http://localhost:8000';
   console.log('🔍 Fact Checker: Content script loaded');
 
-  // Screenshot/rectangle selection mode
-  let screenshotMode = false;
-  let startX, startY;
-  let selectionBox = null;
-
-  function enterScreenshotMode() {
-    screenshotMode = true;
-    console.log('Screenshot mode activated - drag to select area');
-
-    // Create overlay for screenshot mode
-    const overlay = document.createElement('div');
-    overlay.id = 'fc-screenshot-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.3);
-      cursor: crosshair;
-      z-index: 99998;
-    `;
-
-    // Create instruction text
-    const instruction = document.createElement('div');
-    instruction.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 6px;
-      z-index: 99999;
-      font-size: 14px;
-      font-weight: 600;
-    `;
-    instruction.textContent = 'Drag to select area for OCR • Press Esc to cancel';
-
-    document.body.appendChild(overlay);
-    document.body.appendChild(instruction);
-
-    overlay.addEventListener('mousedown', (e) => {
-      startX = e.clientX;
-      startY = e.clientY;
-
-      selectionBox = document.createElement('div');
-      selectionBox.style.cssText = `
-        position: fixed;
-        border: 2px solid #1877f2;
-        background: rgba(24, 119, 242, 0.1);
-        z-index: 99999;
-        pointer-events: none;
-      `;
-      document.body.appendChild(selectionBox);
-
-      const handleMouseMove = (e) => {
-        const currentX = e.clientX;
-        const currentY = e.clientY;
-        const width = Math.abs(currentX - startX);
-        const height = Math.abs(currentY - startY);
-        const left = Math.min(startX, currentX);
-        const top = Math.min(startY, currentY);
-
-        selectionBox.style.left = left + 'px';
-        selectionBox.style.top = top + 'px';
-        selectionBox.style.width = width + 'px';
-        selectionBox.style.height = height + 'px';
-      };
-
-      const handleMouseUp = async (e) => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-
-        overlay.remove();
-        instruction.remove();
-
-        if (selectionBox) {
-          selectionBox.remove();
-        }
-
-        // Capture the selected area
-        const width = Math.abs(e.clientX - startX);
-        const height = Math.abs(e.clientY - startY);
-
-        if (width < 50 || height < 50) {
-          showError(document.body, 'Selection area too small. Please select a larger area.');
-          screenshotMode = false;
-          return;
-        }
-
-        const left = Math.min(startX, e.clientX);
-        const top = Math.min(startY, e.clientY);
-
-        console.log(`Capturing area: ${width}x${height} at (${left}, ${top})`);
-        captureArea(left, top, width, height);
-        screenshotMode = false;
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    });
-
-    // Cancel on Escape
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        screenshotMode = false;
-        overlay.remove();
-        instruction.remove();
-        if (selectionBox) selectionBox.remove();
-        document.removeEventListener('keydown', handleEscape);
-        console.log('Screenshot mode cancelled');
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-  }
-
-  async function captureArea(x, y, width, height) {
-    console.log('Screenshot area selected:', width, 'x', height, 'at', x, ',', y);
-
-    // Use browser's native screenshot API if available
-    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-      showError(document.body, `Screenshot area selected! Now:\n\n1. Press Print Screen or use your OS screenshot tool\n2. Crop to the area you selected\n3. Paste the screenshot in the extension popup's "Manual OCR" field\n4. Click "Extract Text & Fact-Check"\n\nAlternatively, right-click the image and copy its address, then paste in the popup.`);
-      return;
-    }
-
-    // Fallback: guide user to manual process
-    const message = `You selected an area with text!\n\nTo OCR it:\n1. Take a screenshot of this area (Print Screen)\n2. In the extension popup, paste the image URL or screenshot\n3. Click "Extract Text & Fact-Check"\n\nOr copy an image link and paste it directly.`;
-
-    showError(document.body, message);
-  }
-
-  // Keyboard shortcut to activate screenshot mode
-  document.addEventListener('keydown', (e) => {
-    // Ctrl+Shift+X to activate OCR screenshot
-    if (e.ctrlKey && e.shiftKey && e.code === 'KeyX') {
-      e.preventDefault();
-      enterScreenshotMode();
-    }
-  });
-
 
   async function performOCR(imageUrl) {
     console.log('Starting OCR on image:', imageUrl);
@@ -219,27 +77,6 @@
     }
   }
 
-  function isDetailPage() {
-    const url = window.location.href;
-    return url.includes('/permalink/') || url.includes('/posts/');
-  }
-
-  function reverseImageSearch(imageUrl, service = 'tineye') {
-    let searchUrl;
-    const encodedUrl = encodeURIComponent(imageUrl);
-
-    if (service === 'tineye') {
-      searchUrl = `https://tineye.com/search?url=${encodedUrl}`;
-    } else if (service === 'google') {
-      // Google Images reverse search using the upload form method
-      searchUrl = `https://www.google.com/searchbyimage?image_url=${encodedUrl}`;
-    }
-
-    console.log(`Opening ${service} reverse image search...`);
-    console.log(`URL: ${searchUrl}`);
-    window.open(searchUrl, '_blank');
-  }
-
   async function extractPostText(article) {
     console.log('extractPostText called');
 
@@ -296,95 +133,6 @@
           console.log('✗ Post text elements not found in modal');
         }
 
-        // Extract post images only (not avatars)
-        const postImages = modal.querySelectorAll('img[data-imgperflogname="feedImage"]');
-        if (postImages.length > 0) {
-          console.log('Found', postImages.length, 'post image(s) in modal');
-
-          // Create reverse search panel
-          const imageLinksDiv = document.createElement('div');
-          imageLinksDiv.id = 'fc-image-search-links';
-          imageLinksDiv.style.cssText = `
-            position: fixed !important;
-            bottom: 20px !important;
-            right: 20px !important;
-            background: white !important;
-            border: 2px solid #1877f2 !important;
-            border-radius: 8px !important;
-            padding: 12px !important;
-            z-index: 999998 !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
-            max-width: 200px !important;
-          `;
-
-          const title = document.createElement('div');
-          title.textContent = 'Reverse Image Search';
-          title.style.cssText = `
-            font-weight: bold !important;
-            margin-bottom: 8px !important;
-            color: #1877f2 !important;
-            font-size: 12px !important;
-          `;
-          imageLinksDiv.appendChild(title);
-
-          postImages.forEach((img, idx) => {
-            // Try to get the original image URL from various sources
-            let imgSrc = img.src || img.getAttribute('data-src') || img.getAttribute('data-image-url');
-
-            // Try to get full resolution by checking parent elements
-            const picture = img.closest('picture');
-            if (picture) {
-              const sources = picture.querySelectorAll('source');
-              for (const source of sources) {
-                const srcset = source.getAttribute('srcset');
-                if (srcset) {
-                  imgSrc = srcset.split(' ')[0];
-                  break;
-                }
-              }
-            }
-
-            console.log(`🖼️ Image ${idx}: ${imgSrc}`);
-
-            if (imgSrc && imgSrc.length > 10) {
-              const btnTineye = document.createElement('button');
-              btnTineye.textContent = `Image ${idx} - TinEye`;
-              btnTineye.style.cssText = `
-                display: block !important;
-                width: 100% !important;
-                margin: 4px 0 !important;
-                padding: 8px !important;
-                background: #1877f2 !important;
-                color: white !important;
-                border: none !important;
-                border-radius: 4px !important;
-                cursor: pointer !important;
-                font-size: 11px !important;
-              `;
-              btnTineye.onclick = () => reverseImageSearch(imgSrc, 'tineye');
-              imageLinksDiv.appendChild(btnTineye);
-
-              const btnGoogle = document.createElement('button');
-              btnGoogle.textContent = `Image ${idx} - Google`;
-              btnGoogle.style.cssText = `
-                display: block !important;
-                width: 100% !important;
-                margin: 4px 0 8px 0 !important;
-                padding: 8px !important;
-                background: #34a853 !important;
-                color: white !important;
-                border: none !important;
-                border-radius: 4px !important;
-                cursor: pointer !important;
-                font-size: 11px !important;
-              `;
-              btnGoogle.onclick = () => reverseImageSearch(imgSrc, 'google');
-              imageLinksDiv.appendChild(btnGoogle);
-            }
-          });
-
-          document.body.appendChild(imageLinksDiv);
-        }
       } else {
         console.log('✗ Modal not found');
       }
@@ -412,132 +160,23 @@
     return text.replace(/[&<>"']/g, m => map[m]);
   }
 
-  function removeOverlay(container) {
-    container.querySelector('[data-fc-overlay]')?.remove();
-  }
-
-  function renderClaim(claim) {
-    const verdictClass = {
-      'true': 'fc-verdict-true',
-      'false': 'fc-verdict-false',
-      'mixture': 'fc-verdict-mixture',
-      'unverified': 'fc-verdict-unverified',
-    }[claim.verdict?.toLowerCase()] ?? 'fc-verdict-unverified';
-
-    const sources = claim.sources.map(s =>
-      `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.publisher)}</a>`
-    ).join(', ');
-
-    return `
-      <li class="fc-claim">
-        <p class="fc-claim-text">"${escapeHtml(claim.text)}"</p>
-        <span class="fc-verdict ${verdictClass}">${claim.verdict ?? 'Unverified'}</span>
-        ${sources ? `<p class="fc-sources">Sources: ${sources}</p>` : ''}
-      </li>
-    `;
-  }
-
-  function showResults(container, data) {
-    removeOverlay(container);
-    const overlay = document.createElement('div');
-    overlay.className = 'fc-overlay';
-    overlay.setAttribute('data-fc-overlay', 'true');
-
-    if (data.claims.length === 0) {
-      overlay.innerHTML = `<p class="fc-no-results">No fact-checkable claims found in this post.</p>`;
-    } else {
-      overlay.innerHTML = `
-        <div class="fc-header">
-          <span class="fc-title">Fact Check Results</span>
-          <button class="fc-close" aria-label="Close">✕</button>
-        </div>
-        <ul class="fc-claims">
-          ${data.claims.map(c => renderClaim(c)).join('')}
-        </ul>
-      `;
-      overlay.querySelector('.fc-close').addEventListener('click', () => removeOverlay(container));
-    }
-
-    container.appendChild(overlay);
-  }
-
   function parseTextWithLinks(text) {
     if (!text || typeof text !== 'string') {
       console.error('parseTextWithLinks received invalid text:', text);
       return escapeHtml(String(text));
     }
 
-    // Add link CSS if not already added
-    if (!document.getElementById('fc-link-styles')) {
-      const styleSheet = document.createElement('style');
-      styleSheet.id = 'fc-link-styles';
-      styleSheet.textContent = `
-        a.fc-link {
-          color: #0891B2 !important;
-          text-decoration: none !important;
-          font-weight: 500 !important;
-          transition: text-decoration 0.2s !important;
-        }
-        a.fc-link:hover {
-          text-decoration: underline !important;
-        }
-      `;
-      document.head.appendChild(styleSheet);
-    }
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
 
-    // Process markdown-style links and plain URLs
-    const parts = [];
-    const markdownRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const urlRegex = /(https?:\/\/[^\s<"']+)/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = markdownRegex.exec(text)) !== null) {
-      // Add text before the link (with URLs converted to links)
-      if (match.index > lastIndex) {
-        const textBefore = text.substring(lastIndex, match.index);
-        parts.push(convertPlainUrlsToLinks(escapeHtml(textBefore)));
+    return parts.map((part, idx) => {
+      if (part && part.match(urlRegex)) {
+        // Remove trailing punctuation if present
+        const cleanUrl = part.replace(/[.,;:!?)]$/, '');
+        return `<a href="${escapeHtml(cleanUrl)}" target="_blank" rel="noopener noreferrer" style="color: #1877f2 !important; text-decoration: none !important; font-weight: 500 !important;" onmouseover="this.style.textDecoration='underline !important'" onmouseout="this.style.textDecoration='none !important'">${escapeHtml(cleanUrl)}</a>`;
       }
-
-      // Add the markdown link
-      const linkText = match[1];
-      const url = match[2];
-      parts.push(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="fc-link">${escapeHtml(linkText)}</a>`);
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Add remaining text (with URLs converted to links)
-    if (lastIndex < text.length) {
-      const textAfter = text.substring(lastIndex);
-      parts.push(convertPlainUrlsToLinks(escapeHtml(textAfter)));
-    }
-
-    return parts.length > 0 ? parts.join('') : convertPlainUrlsToLinks(escapeHtml(text));
-  }
-
-  function convertPlainUrlsToLinks(text) {
-    const urlRegex = /(https?:\/\/[^\s<"']+)/g;
-    return text.replace(urlRegex, (url) => {
-      // Remove trailing punctuation
-      const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
-      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="fc-link">${cleanUrl}</a>`;
-    });
-  }
-
-  function markdownToHtml(text) {
-    let html = parseTextWithLinks(text);
-
-    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #0891B2 !important;">$1</h3>');
-    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h2>');
-    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h1>');
-
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #1F2937 !important; font-weight: 700 !important;">$1</strong>');
-
-    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #0891B2, transparent) !important;"></div></div>');
-
-    html = html.replace(/\n/g, '<br>');
-
-    return html;
+      return part ? escapeHtml(part) : '';
+    }).join('');
   }
 
   function showClaudeResults(container, responseText, originalText) {
@@ -559,42 +198,45 @@
       top: 20px !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
-      background: #FFFFFF !important;
-      border: 1px solid #E5E7EB !important;
-      border-radius: 12px !important;
+      background: white !important;
+      border: 1px solid #e4e6eb !important;
+      border-radius: 8px !important;
       padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #374151 !important;
+      color: #050505 !important;
       z-index: 999999 !important;
-      line-height: 1.6 !important;
+      line-height: 1.5 !important;
       width: 90% !important;
       max-width: 700px !important;
       max-height: calc(100vh - 40px) !important;
       display: flex !important;
       flex-direction: column !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     `;
 
-    const responseHtml = markdownToHtml(responseText);
+    const responseHtml = parseTextWithLinks(responseText)
+      .replace(/\n/g, '<br>')
+      .replace(/^##\s+(.+)$/gm, '<h3 style="margin: 12px 0 6px 0 !important; font-size: 15px !important; font-weight: 600 !important;">$1</h3>')
+      .replace(/^\*\*(.+?)\*\*:/gm, '<strong style="color: #1877f2 !important;">$1:</strong>');
 
     console.log('Formatted HTML length:', responseHtml.length);
 
     const originalTextHtml = originalText ? `
-      <div style="background: #F0F9FB !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #0891B2 !important; border-radius: 6px !important;">
-        <div style="font-weight: 700 !important; font-size: 12px !important; color: #0891B2 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important;">📝 Original Text</div>
-        <div style="font-size: 13px !important; color: #4B5563 !important; word-wrap: break-word !important; white-space: pre-wrap !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important;">
+      <div style="background: #f0f2f5 !important; padding: 12px !important; margin-bottom: 12px !important; border-left: 4px solid #1877f2 !important; border-radius: 4px !important;">
+        <div style="font-weight: 600 !important; font-size: 12px !important; color: #1877f2 !important; margin-bottom: 6px !important;">📝 Original Text:</div>
+        <div style="font-size: 12px !important; color: #65676b !important; word-wrap: break-word !important; white-space: pre-wrap !important; max-height: 120px !important; overflow-y: auto !important;">
           ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
         </div>
       </div>
     ` : '';
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #0891B2 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F0F9FB 0%, #F5FEFB 100%) !important;">
-        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #0891B2 !important;">✓ Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #9CA3AF !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 12px 16px !important; border-bottom: 1px solid #e4e6eb !important; flex-shrink: 0 !important; background: #fafbfc !important;">
+        <span class="fc-title" style="font-weight: 600 !important; font-size: 14px !important;">Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #65676b !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important;">✕</button>
       </div>
-      <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
+      <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 16px !important; white-space: normal !important; word-wrap: break-word !important;">
         ${originalTextHtml}
         ${responseHtml}
       </div>
@@ -605,86 +247,9 @@
       console.log('Closing overlay');
       overlay.remove();
     });
-    closeBtn.addEventListener('mouseover', () => {
-      closeBtn.style.color = '#374151 !important';
-    });
-    closeBtn.addEventListener('mouseout', () => {
-      closeBtn.style.color = '#9CA3AF !important';
-    });
 
     document.body.appendChild(overlay);
     console.log('Overlay appended to body with fixed positioning');
-  }
-
-  function showLoadingAnimation() {
-    const overlay = document.createElement('div');
-    overlay.className = 'fc-overlay fc-overlay-loading';
-    overlay.setAttribute('data-fc-overlay', 'true');
-    overlay.id = 'fc-loading-overlay';
-    overlay.style.cssText = `
-      position: fixed !important;
-      top: 50% !important;
-      left: 50% !important;
-      transform: translate(-50%, -50%) !important;
-      background: white !important;
-      border: 1px solid #E5E7EB !important;
-      border-radius: 12px !important;
-      padding: 0 !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-      font-size: 14px !important;
-      color: #374151 !important;
-      z-index: 999999 !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
-      width: 280px !important;
-      height: 350px !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 0 !important;
-    `;
-
-    overlay.innerHTML = `
-      <div style="width: 100%; height: 85%; flex: 1;">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-          <defs>
-            <filter height="140%" id="glass-shadow" width="140%" x="-20%" y="-20%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="2"></feGaussianBlur>
-              <feOffset dx="1" dy="1" result="offsetblur"></feOffset>
-              <feComponentTransfer>
-                <feFuncA slope="0.3" type="linear"></feFuncA>
-              </feComponentTransfer>
-              <feMerge>
-                <feMergeNode></feMergeNode>
-                <feMergeNode in="SourceGraphic"></feMergeNode>
-              </feMerge>
-            </filter>
-          </defs>
-          <g filter="url(#glass-shadow)">
-            <g>
-              <animateMotion dur="4s" path="M 50,35 A 15,15 0 1 1 49.99,35 Z" repeatCount="indefinite"></animateMotion>
-              <g transform="rotate(-45)">
-                <rect fill="#0a6b8a" height="25" rx="1" width="6" x="-3" y="15"></rect>
-                <circle cx="0" cy="0" fill="none" r="18" stroke="#0a6b8a" stroke-width="6"></circle>
-                <circle cx="0" cy="0" fill="rgba(8, 145, 178, 0.15)" r="16"></circle>
-                <path d="M-8 -8 Q -4 -12 0 -8" fill="none" opacity="0.6" stroke="white" stroke-linecap="round" stroke-width="1.5"></path>
-              </g>
-            </g>
-          </g>
-        </svg>
-      </div>
-      <div style="font-weight: 500; color: #0891B2; flex-shrink: 0; padding: 16px; width: 100%; text-align: center; box-sizing: border-box;">Fact-checking...</div>
-    `;
-
-    document.body.appendChild(overlay);
-    return overlay;
-  }
-
-  function removeLoadingAnimation() {
-    const overlay = document.getElementById('fc-loading-overlay');
-    if (overlay) {
-      overlay.remove();
-    }
   }
 
   function showError(container, message) {
@@ -696,33 +261,26 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: #FEF2F2 !important;
-      border: 1px solid #FECACA !important;
-      border-radius: 12px !important;
+      background: #fff3cd !important;
+      border: 1px solid #ffc107 !important;
+      border-radius: 8px !important;
       padding: 16px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #7F1D1D !important;
+      color: #856404 !important;
       z-index: 999999 !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
       max-width: 400px !important;
       display: flex !important;
-      gap: 12px !important;
+      gap: 8px !important;
       align-items: flex-start !important;
     `;
     overlay.innerHTML = `
       <span class="fc-error-icon" style="font-size: 20px !important; flex-shrink: 0 !important;">⚠️</span>
       <span style="flex: 1 !important;">${escapeHtml(message)}</span>
-      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #D97706 !important; padding: 0 !important; transition: color 0.2s !important;">✕</button>
+      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #856404 !important; padding: 0 !important;">✕</button>
     `;
-    const errorCloseBtn = overlay.querySelector('.fc-close');
-    errorCloseBtn.addEventListener('click', () => overlay.remove());
-    errorCloseBtn.addEventListener('mouseover', () => {
-      errorCloseBtn.style.color = '#7F1D1D !important';
-    });
-    errorCloseBtn.addEventListener('mouseout', () => {
-      errorCloseBtn.style.color = '#D97706 !important';
-    });
+    overlay.querySelector('.fc-close').addEventListener('click', () => overlay.remove());
     document.body.appendChild(overlay);
   }
 
@@ -751,9 +309,6 @@
 
       console.log('Sending fact-check request to background service worker');
 
-      // Show loading animation
-      showLoadingAnimation();
-
       // Send message to background service worker to handle Claude API call
       chrome.runtime.sendMessage(
         {
@@ -763,9 +318,6 @@
         },
         (response) => {
           console.log('Response from background:', response);
-
-          // Remove loading animation
-          removeLoadingAnimation();
 
           if (!response) {
             console.error('No response from background');
@@ -787,120 +339,10 @@
       );
     } catch (e) {
       console.error('Error:', e);
-      removeLoadingAnimation();
       showError(article, `Error: ${e.message}`);
       btn.disabled = false;
       btn.textContent = '🔍 Fact Check';
     }
-  }
-
-  function injectButton() {
-    console.log('injectButton() called');
-    console.log('Current URL:', window.location.href);
-
-    if (!isDetailPage()) {
-      console.log('Not on detail page (URL check failed), skipping');
-      return;
-    }
-
-    console.log('✓ On detail page');
-
-    // Find the main post container
-    const article = document.querySelector('[role="article"]');
-    if (!article) {
-      console.log('✗ Article not found with [role="article"]');
-      return;
-    }
-
-    console.log('✓ Article found:', article);
-
-    // Store reference to this article globally so click handler can use it
-    window._fcMainArticle = article;
-
-    // Check if button already exists
-    const existingWrapper = document.querySelector('[data-fc-wrapper]');
-    if (existingWrapper) {
-      console.log('Button already exists, updating article reference');
-      window._fcMainArticle = article;
-      return;
-    }
-
-    console.log('Creating button...');
-
-    const btn = document.createElement('button');
-    btn.className = 'fc-btn';
-    btn.textContent = '🔍 Fact Check';
-
-    // Add inline styles to force visibility - VERY obvious
-    btn.style.cssText = `
-      background-color: #FF0000 !important;
-      color: white !important;
-      border: 3px solid yellow !important;
-      border-radius: 8px !important;
-      padding: 15px 20px !important;
-      font-size: 16px !important;
-      font-weight: 900 !important;
-      cursor: pointer !important;
-      display: block !important;
-      margin: 16px auto !important;
-      z-index: 10000 !important;
-      width: auto !important;
-      min-width: 150px !important;
-      box-shadow: 0 0 10px red !important;
-      position: relative !important;
-    `;
-
-    // Wrap button in a container - use fixed positioning to appear on top
-    const wrapper = document.createElement('div');
-    wrapper.setAttribute('data-fc-wrapper', 'true');
-    wrapper.style.cssText = `
-      position: fixed !important;
-      top: 20px !important;
-      left: 50% !important;
-      transform: translateX(-50%) !important;
-      background-color: #FFEEEE !important;
-      border: 2px solid red !important;
-      border-radius: 8px !important;
-      padding: 12px !important;
-      text-align: center !important;
-      display: block !important;
-      z-index: 999999 !important;
-      width: auto !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-    `;
-    wrapper.appendChild(btn);
-
-    // When button is clicked, use the stored article reference
-    btn.addEventListener('click', () => {
-      console.log('Button clicked!');
-      const articleToCheck = window._fcMainArticle;
-      if (articleToCheck && articleToCheck.isConnected) {
-        console.log('Using stored article reference');
-        handleFactCheck(articleToCheck, btn);
-      } else {
-        console.log('Stored article reference stale, finding main article');
-        const allArticles = Array.from(document.querySelectorAll('[role="article"]'));
-        // The main post should be the one with the largest size
-        const mainArticle = allArticles.reduce((max, current) => {
-          const currentSize = current.offsetHeight * current.offsetWidth;
-          const maxSize = max.offsetHeight * max.offsetWidth;
-          return currentSize > maxSize ? current : max;
-        }, allArticles[0]);
-
-        if (mainArticle) {
-          console.log('Found main article, size:', mainArticle.offsetHeight * mainArticle.offsetWidth);
-          window._fcMainArticle = mainArticle;
-          handleFactCheck(mainArticle, btn);
-        } else {
-          console.log('Could not find any article');
-          alert('Could not find post. Please refresh the page.');
-        }
-      }
-    });
-
-    // Append wrapper to body so it appears on top of everything
-    document.body.appendChild(wrapper);
-    console.log('✓ Button wrapper appended to body with fixed positioning');
   }
 
   // Store last clicked element for OCR fallback
@@ -959,12 +401,7 @@
   // Listen for messages from background script and popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
-      if (request.action === 'activateScreenshot') {
-        console.log('Activating screenshot mode from popup');
-        enterScreenshotMode();
-        sendResponse({ success: true });
-        return true;
-      } else if (request.action === 'factCheckText') {
+      if (request.action === 'factCheckText') {
       const selectedText = request.text;
       console.log('Fact-checking selected text:', selectedText.substring(0, 100));
       performFactCheck(selectedText, document.body);
@@ -1016,8 +453,22 @@
   });
 
   async function performFactCheck(text, container) {
-    // Show animated loading state
-    showLoadingAnimation();
+    // Create a status message
+    const statusDiv = document.createElement('div');
+    statusDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    `;
+    statusDiv.textContent = 'Fact-checking...';
+    document.body.appendChild(statusDiv);
 
     try {
       // Send to background service worker
@@ -1030,7 +481,7 @@
         },
         (response) => {
           console.log('Got response from background:', response);
-          removeLoadingAnimation();
+          statusDiv.remove();
 
           if (!response) {
             showError(container, 'No response from background service worker');
@@ -1046,7 +497,7 @@
       );
     } catch (e) {
       console.error('Error sending message:', e);
-      removeLoadingAnimation();
+      statusDiv.remove();
       showError(container, `Error: ${e.message}`);
     }
   }
