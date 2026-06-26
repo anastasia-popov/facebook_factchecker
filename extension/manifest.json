@@ -4,15 +4,13 @@
   "version": "1.1",
   "description": "Fact-check text and images on any website with Claude AI or Google Fact Check API.",
   "permissions": ["storage", "contextMenus"],
-  "web_accessible_resources": [
-    {
-      "resources": ["tesseract-core.wasm.js"],
-      "matches": ["<all_urls>"]
-    }
-  ],
+  "content_security_policy": {
+    "script-src": ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    "worker-src": ["'self'", "blob:"]
+  },
   "host_permissions": [
-    "https://www.facebook.com/*",
-    "http://localhost:8000/*"
+    "https://*/*",
+    "http://*/*"
   ],
   "content_scripts": [
     {

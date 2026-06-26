@@ -19,10 +19,10 @@ function setupContextMenus() {
       }
     });
 
-    // Create context menu for image OCR fact-checking
+    // Create context menu for image OCR fact-checking (only shows when right-clicking images)
     chrome.contextMenus.create({
       id: 'factcheck-image',
-      title: '🔍 Extract & Fact Check Image Text',
+      title: '🔍 Fact Check Image Text',
       contexts: ['image']
     }, () => {
       if (chrome.runtime.lastError) {

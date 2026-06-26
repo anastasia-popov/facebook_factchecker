@@ -10,35 +10,6 @@
       font-size: 13px;
       color: #050505;
     }
-    h1 {
-      font-size: 14px;
-      margin: 0 0 12px 0;
-      font-weight: 600;
-    }
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-      padding: 12px;
-      background-color: #f1f3f4;
-      border-radius: 6px;
-    }
-    .status-indicator {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-    .status-indicator.ok {
-      background-color: #34a853;
-    }
-    .status-indicator.error {
-      background-color: #ea4335;
-    }
-    .status-text {
-      flex: 1;
-    }
     .form-group {
       margin-bottom: 12px;
     }
@@ -63,7 +34,7 @@
       box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
     }
     button {
-      background-color: #1877f2;
+      background-color: #31a24c;
       color: white;
       border: none;
       border-radius: 6px;
@@ -74,61 +45,11 @@
       width: 100%;
     }
     button:hover {
-      background-color: #165ec7;
-    }
-    .info-text {
-      margin-top: 16px;
-      padding: 12px;
-      background-color: #e7f3ff;
-      border-left: 3px solid #1877f2;
-      border-radius: 4px;
-      font-size: 12px;
-      line-height: 1.4;
-      color: #065fd4;
-    }
-    a {
-      color: #065fd4;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    input[type="password"] {
-      font-family: monospace;
+      background-color: #2a8f40;
     }
   </style>
 </head>
 <body>
-  <h1>🔍 Fact Checker</h1>
-
-  <div class="status">
-    <div class="status-indicator" id="statusIndicator"></div>
-    <div class="status-text" id="statusText">Checking…</div>
-  </div>
-
-  <div class="form-group">
-    <label>Fact-Checking Method</label>
-    <div style="display: flex; gap: 16px; margin-top: 8px;">
-      <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; margin: 0;">
-        <input type="radio" name="factChecker" value="claude" id="claudeRadio">
-        Claude AI
-      </label>
-      <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; margin: 0;">
-        <input type="radio" name="factChecker" value="google" id="googleRadio">
-        Google Fact Check
-      </label>
-    </div>
-  </div>
-
-  <div class="form-group">
-    <label for="claudeApiKey">Claude API Key</label>
-    <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
-  </div>
-
-  <button id="saveBtn">Save Settings</button>
-
-  <hr style="margin: 16px 0; border: none; border-top: 1px solid #e4e6eb;">
-
   <div class="form-group">
     <label for="imageUrl">Image URL or Paste Screenshot</label>
     <input type="text" id="imageUrl" placeholder="https://... or Ctrl+V to paste screenshot">
@@ -137,11 +58,7 @@
     </div>
   </div>
 
-  <button id="ocrBtn" style="background-color: #31a24c;">Extract Text & Fact-Check</button>
-
-  <div class="info-text" style="margin-top: 12px;">
-    <strong>For Instagram:</strong> Right-click image → Copy image link → Paste above → Click "Extract Text"
-  </div>
+  <button id="ocrBtn">Extract Text & Fact-Check</button>
 </body>
 <script src="popup.js"></script>
 </html>
