@@ -71,6 +71,9 @@ async function handleLogin() {
       code_verifier: code_challenge
     });
 
+    // Set up window message listener BEFORE opening OAuth window
+    window.addEventListener('message', handleOAuthMessage);
+
     // Open OAuth popup window
     chrome.windows.create({
       url: oauth_url,
@@ -78,56 +81,37 @@ async function handleLogin() {
       width: 500,
       height: 600
     });
-
-    // Set up message listener for OAuth callback
-    chrome.runtime.onMessage.addListener(handleOAuthMessage);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
     googleBtn.disabled = false;
   }
 }
 
-function handleOAuthMessage(request, sender, sendResponse) {
-  if (request.action === 'oauthCallback') {
-    handleOAuthCallback(request.code, request.state);
+function handleOAuthMessage(event) {
+  // Accept messages from localhost (our backend callback page)
+  if (!event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) {
+    return;
+  }
+
+  if (event.data && event.data.action === 'oauthCallback') {
+    if (event.data.success) {
+      handleOAuthSuccess(event.data.accessToken, event.data.refreshToken);
+    } else {
+      handleOAuthError(event.data.error || 'Authentication failed');
+    }
   }
 }
 
-async function handleOAuthCallback(code, state) {
+async function handleOAuthSuccess(accessToken, refreshToken) {
   const googleBtn = document.getElementById('googleLoginBtn');
   const errorDiv = document.getElementById('loginError');
 
   try {
-    const auth = await chrome.storage.local.get(['oauth_state', 'code_verifier']);
-
-    // Validate state
-    if (auth.oauth_state !== state) {
-      throw new Error('Invalid state parameter - possible CSRF attack');
-    }
-
-    // Exchange code for tokens
-    const response = await fetch(`${BACKEND_URL}/auth/google/callback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code,
-        state,
-        code_verifier: auth.code_verifier
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Token exchange failed');
-    }
-
-    const { access_token, refresh_token } = await response.json();
-
     // Store tokens securely
     await chrome.storage.local.set({
       auth: {
-        accessToken: access_token,
-        refreshToken: refresh_token,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
         accessTokenExpiry: Date.now() + (60 * 60 * 1000), // 1 hour
         isAuthenticated: true,
         lastRefresh: Date.now()
@@ -141,6 +125,12 @@ async function handleOAuthCallback(code, state) {
     showLoginError('Authentication failed: ' + error.message);
     googleBtn.disabled = false;
   }
+}
+
+function handleOAuthError(errorMessage) {
+  const googleBtn = document.getElementById('googleLoginBtn');
+  showLoginError('Authentication failed: ' + errorMessage);
+  googleBtn.disabled = false;
 }
 
 function showLoginError(message) {
