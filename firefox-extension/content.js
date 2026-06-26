@@ -489,8 +489,9 @@
     let html = parseTextWithLinks(text);
 
     // Convert markdown tables to HTML tables
-    html = html.replace(/^\|(.+)\|$/gm, (match) => {
-      const lines = match.split('\n').filter(line => line.trim().startsWith('|'));
+    // Find all markdown tables (consecutive lines starting with |)
+    html = html.replace(/(\n|^)((?:\|.+\|\n?)+)/gm, (match, prefix, tableBlock) => {
+      const lines = tableBlock.split('\n').filter(line => line.trim().length > 0 && line.trim().startsWith('|'));
       if (lines.length < 2) return match;
 
       let tableHtml = '<table style="border-collapse: collapse !important; width: 100% !important; margin: 16px 0 !important; border: 1px solid #E5E7EB !important;">';
@@ -498,20 +499,24 @@
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        // Skip separator lines (lines with dashes)
-        if (/^\|[\s-:|]+\|$/.test(line)) {
+
+        // Skip separator lines (lines with only dashes, pipes, and colons)
+        if (/^\|[\s\-:|]*\|$/.test(line)) {
           continue;
         }
 
+        // Extract cells between pipes
         const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+        if (cells.length === 0) continue;
+
         const tagName = isHeader ? 'th' : 'td';
         const cellStyle = isHeader
-          ? 'style="background: #F0F9FB !important; color: #0891B2 !important; font-weight: 700 !important; padding: 10px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
-          : 'style="padding: 10px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"';
+          ? 'style="background: #F0F9FB !important; color: #0891B2 !important; font-weight: 700 !important; padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
+          : 'style="padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"';
 
         tableHtml += `<tr>`;
         cells.forEach(cell => {
-          tableHtml += `<${tagName} ${cellStyle}>${escapeHtml(cell)}</${tagName}>`;
+          tableHtml += `<${tagName} ${cellStyle}>${cell}</${tagName}>`;
         });
         tableHtml += `</tr>`;
 
@@ -519,7 +524,7 @@
       }
 
       tableHtml += '</table>';
-      return tableHtml;
+      return prefix + tableHtml;
     });
 
     html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #0891B2 !important;">$1</h3>');
