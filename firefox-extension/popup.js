@@ -194,12 +194,6 @@ function displayProfile(profile) {
   const memberDate = new Date(profile.created_at).toLocaleDateString();
   document.getElementById('memberSince').textContent = memberDate;
 
-  // Daily quota
-  const dailyPercent = (profile.quotas.daily_used / profile.quotas.daily_limit) * 100;
-  document.getElementById('dailyUsed').textContent = profile.quotas.daily_used;
-  document.getElementById('dailyLimit').textContent = profile.quotas.daily_limit;
-  document.getElementById('dailyBar').style.width = dailyPercent + '%';
-
   // Monthly quota
   const monthlyPercent = (profile.quotas.monthly_used / profile.quotas.monthly_limit) * 100;
   document.getElementById('monthlyUsed').textContent = profile.quotas.monthly_used;

@@ -41,9 +41,6 @@ class QuotaInfo(BaseModel):
     monthly_limit: int
     monthly_used: int
     monthly_remaining: int
-    daily_limit: int
-    daily_used: int
-    daily_remaining: int
 
 
 class UsageInfo(BaseModel):
