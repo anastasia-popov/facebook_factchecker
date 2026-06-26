@@ -33,31 +33,6 @@ function initializeButton() {
     }
 
     const btn = document.getElementById('ocrBtn');
-    const originalText = btn.textContent;
-
-    // Show loading animation
-    console.log('Showing loading animation');
-    const contentContainer = document.getElementById('contentContainer');
-    const loadingContainer = document.getElementById('loadingContainer');
-
-    console.log('Content container:', contentContainer);
-    console.log('Loading container:', loadingContainer);
-
-    if (!contentContainer) {
-      console.error('Content container not found!');
-      return;
-    }
-    if (!loadingContainer) {
-      console.error('Loading container not found!');
-      return;
-    }
-
-    contentContainer.style.display = 'none';
-    loadingContainer.classList.add('show');
-
-    console.log('Loading container display:', window.getComputedStyle(loadingContainer).display);
-    console.log('Loading container classes:', loadingContainer.className);
-
     btn.disabled = true;
 
   try {
@@ -97,22 +72,16 @@ function initializeButton() {
           });
         } else {
           alert('No text found in the image');
-          document.getElementById('contentContainer').style.display = 'block';
-          document.getElementById('loadingContainer').classList.remove('show');
           btn.disabled = false;
         }
       } catch (error) {
         alert('Error: ' + error.message);
-        document.getElementById('contentContainer').style.display = 'block';
-        document.getElementById('loadingContainer').classList.remove('show');
         btn.disabled = false;
       }
     } else {
       // Handle URL
       if (!imageUrl.startsWith('http')) {
         alert('Please enter a valid image URL (starting with http or https)');
-        document.getElementById('contentContainer').style.display = 'block';
-        document.getElementById('loadingContainer').classList.remove('show');
         btn.disabled = false;
         return;
       }
@@ -124,8 +93,6 @@ function initializeButton() {
       }, (response) => {
         if (chrome.runtime.lastError) {
           alert('Error: ' + chrome.runtime.lastError.message);
-          document.getElementById('contentContainer').style.display = 'block';
-          document.getElementById('loadingContainer').classList.remove('show');
           btn.disabled = false;
         } else {
           console.log('Fact-check initiated, closing popup');
@@ -135,8 +102,6 @@ function initializeButton() {
     }
   } catch (error) {
     alert('Error: ' + error.message);
-    document.getElementById('contentContainer').style.display = 'block';
-    document.getElementById('loadingContainer').classList.remove('show');
     btn.disabled = false;
   }
   });
