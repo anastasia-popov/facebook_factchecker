@@ -2,11 +2,11 @@
   "manifest_version": 3,
   "name": "Fact Checker",
   "version": "1.1",
-  "description": "Fact-check text and images on any website with Claude AI.",
-  "permissions": ["contextMenus"],
+  "description": "Fact-check text and images on any website with Claude AI or Google Fact Check API.",
+  "permissions": ["storage", "contextMenus"],
   "content_security_policy": {
-    "script-src": ["'self'"],
-    "worker-src": ["'self'"]
+    "script-src": ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    "worker-src": ["'self'", "blob:"]
   },
   "host_permissions": [
     "https://*/*",
