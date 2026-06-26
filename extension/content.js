@@ -602,13 +602,11 @@
       styleSheet.id = 'fc-keyframes';
       styleSheet.textContent = `
         @keyframes fc-magnify {
-          0% { transform: rotate(0deg) scale(1); }
-          50% { transform: rotate(25deg) scale(1.05); }
-          100% { transform: rotate(0deg) scale(1); }
-        }
-        @keyframes fc-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
+          0% { transform: translate(0, -12px) rotate(0deg); }
+          25% { transform: translate(12px, -6px) rotate(90deg); }
+          50% { transform: translate(12px, 6px) rotate(180deg); }
+          75% { transform: translate(0, 12px) rotate(270deg); }
+          100% { transform: translate(0, -12px) rotate(360deg); }
         }
       `;
       document.head.appendChild(styleSheet);
@@ -640,8 +638,8 @@
     `;
 
     overlay.innerHTML = `
-      <div style="font-size: 48px; display: inline-block; animation: fc-magnify 2s ease-in-out infinite;">🔍</div>
-      <div style="font-weight: 500; color: #0891B2; animation: fc-pulse 1.5s ease-in-out infinite;">Searching and analyzing…</div>
+      <div style="font-size: 48px; display: inline-block; animation: fc-magnify 2.5s ease-in-out infinite;">🔍</div>
+      <div style="font-weight: 500; color: #0891B2;">Fact-checking...</div>
     `;
 
     document.body.appendChild(overlay);
