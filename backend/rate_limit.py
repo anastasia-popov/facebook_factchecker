@@ -7,10 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    """Token bucket rate limiter for user API requests"""
+    """Rate limiter for user API requests (monthly quota only)"""
 
-    def __init__(self, daily_quota: int = 200, monthly_quota: int = 5000):
-        self.daily_quota = daily_quota
+    def __init__(self, monthly_quota: int = 5000):
         self.monthly_quota = monthly_quota
 
     def check_and_record_usage(
@@ -46,29 +45,17 @@ class RateLimiter:
             db.commit()
             db.refresh(bucket)
 
-        # Reset daily counter if needed
-        if self._should_reset_daily(bucket):
-            bucket.requests_today = 0
-            bucket.requests_today_reset = datetime.utcnow()
-
         # Reset monthly counter if needed
         if self._should_reset_monthly(bucket):
             bucket.requests_this_month = 0
             bucket.requests_month_reset = datetime.utcnow()
 
-        # Check limits
-        daily_remaining = self.daily_quota - bucket.requests_today
+        # Check monthly limit only
         monthly_remaining = self.monthly_quota - bucket.requests_this_month
 
-        allowed = (
-            (bucket.requests_today + tokens_required <= self.daily_quota) and
-            (bucket.requests_this_month + tokens_required <= self.monthly_quota)
-        )
+        allowed = (bucket.requests_this_month + tokens_required <= self.monthly_quota)
 
         quota_info = {
-            'daily_limit': self.daily_quota,
-            'daily_used': bucket.requests_today,
-            'daily_remaining': max(0, daily_remaining),
             'monthly_limit': self.monthly_quota,
             'monthly_used': bucket.requests_this_month,
             'monthly_remaining': max(0, monthly_remaining),
@@ -113,19 +100,12 @@ class RateLimiter:
 
         if not bucket:
             return {
-                'daily_limit': self.daily_quota,
-                'daily_used': 0,
-                'daily_remaining': self.daily_quota,
                 'monthly_limit': self.monthly_quota,
                 'monthly_used': 0,
                 'monthly_remaining': self.monthly_quota
             }
 
         # Reset if needed
-        if self._should_reset_daily(bucket):
-            bucket.requests_today = 0
-            bucket.requests_today_reset = datetime.utcnow()
-
         if self._should_reset_monthly(bucket):
             bucket.requests_this_month = 0
             bucket.requests_month_reset = datetime.utcnow()
@@ -133,20 +113,12 @@ class RateLimiter:
         db.commit()
 
         return {
-            'daily_limit': self.daily_quota,
-            'daily_used': bucket.requests_today,
-            'daily_remaining': max(0, self.daily_quota - bucket.requests_today),
             'monthly_limit': self.monthly_quota,
             'monthly_used': bucket.requests_this_month,
             'monthly_remaining': max(0, self.monthly_quota - bucket.requests_this_month),
             'last_request': self._get_last_request(user, db),
-            'last_reset': bucket.requests_today_reset
+            'last_reset': bucket.requests_month_reset
         }
-
-    @staticmethod
-    def _should_reset_daily(bucket: RateLimitBucket) -> bool:
-        """Check if daily counter should reset (24 hours passed)"""
-        return datetime.utcnow() - bucket.requests_today_reset >= timedelta(days=1)
 
     @staticmethod
     def _should_reset_monthly(bucket: RateLimitBucket) -> bool:

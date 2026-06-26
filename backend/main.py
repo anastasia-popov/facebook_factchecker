@@ -280,10 +280,7 @@ async def get_user_profile(
             quotas=QuotaInfo(
                 monthly_limit=quota_info['monthly_limit'],
                 monthly_used=quota_info['monthly_used'],
-                monthly_remaining=quota_info['monthly_remaining'],
-                daily_limit=quota_info['daily_limit'],
-                daily_used=quota_info['daily_used'],
-                daily_remaining=quota_info['daily_remaining']
+                monthly_remaining=quota_info['monthly_remaining']
             ),
             usage=UsageInfo(
                 total_requests=total_requests,
