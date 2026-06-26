@@ -580,7 +580,7 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: white !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       border: 1px solid #E5E7EB !important;
       border-radius: 12px !important;
       padding: 0 !important;
@@ -589,8 +589,8 @@
       color: #374151 !important;
       z-index: 999999 !important;
       box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
-      width: 280px !important;
-      height: 350px !important;
+      width: 300px !important;
+      height: 300px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
