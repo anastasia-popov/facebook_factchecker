@@ -37,7 +37,6 @@ function setupContextMenus() {
 // Setup menus on install
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed/updated');
-  chrome.storage.local.set({ claudeApiKey: '' });
   setupContextMenus();
 });
 
