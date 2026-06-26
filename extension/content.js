@@ -619,22 +619,24 @@
       background: white !important;
       border: 1px solid #E5E7EB !important;
       border-radius: 12px !important;
-      padding: 40px 32px !important;
+      padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 14px !important;
       color: #374151 !important;
       z-index: 999999 !important;
       box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
-      max-width: 320px !important;
+      width: 280px !important;
+      height: 350px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
-      gap: 20px !important;
+      justify-content: center !important;
+      gap: 0 !important;
     `;
 
     overlay.innerHTML = `
-      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 140px; height: 140px; object-fit: contain; flex: 1;">
-      <div style="font-weight: 500; color: #0891B2; flex-shrink: 0;">Fact-checking...</div>
+      <img src="${chrome.runtime.getURL('loader_animation.gif')}" style="width: 100%; height: 85%; object-fit: contain; flex: 1;">
+      <div style="font-weight: 500; color: #0891B2; flex-shrink: 0; padding: 16px; width: 100%; text-align: center; box-sizing: border-box;">Fact-checking...</div>
     `;
 
     document.body.appendChild(overlay);
