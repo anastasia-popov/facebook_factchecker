@@ -523,7 +523,7 @@
 
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #1F2937 !important; font-weight: 700 !important;">$1</strong>');
 
-    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 60px !important; height: 2px !important; background: linear-gradient(90deg, transparent, #0891B2, transparent) !important; border-radius: 1px !important;"></div></div>');
+    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #0891B2, transparent) !important;"></div></div>');
 
     html = html.replace(/\n/g, '<br>');
 
