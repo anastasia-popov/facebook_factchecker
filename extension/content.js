@@ -596,6 +596,24 @@
   }
 
   function showLoadingAnimation() {
+    // Add keyframes FIRST before creating animated elements
+    if (!document.getElementById('fc-keyframes')) {
+      const styleSheet = document.createElement('style');
+      styleSheet.id = 'fc-keyframes';
+      styleSheet.textContent = `
+        @keyframes fc-magnify {
+          0% { transform: rotate(0deg) scale(1); }
+          50% { transform: rotate(25deg) scale(1.05); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        @keyframes fc-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+      `;
+      document.head.appendChild(styleSheet);
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay fc-overlay-loading';
     overlay.setAttribute('data-fc-overlay', 'true');
@@ -625,24 +643,6 @@
       <div style="font-size: 48px; display: inline-block; animation: fc-magnify 2s ease-in-out infinite;">🔍</div>
       <div style="font-weight: 500; color: #0891B2; animation: fc-pulse 1.5s ease-in-out infinite;">Searching and analyzing…</div>
     `;
-
-    // Add keyframes if not already added
-    if (!document.getElementById('fc-keyframes')) {
-      const styleSheet = document.createElement('style');
-      styleSheet.id = 'fc-keyframes';
-      styleSheet.textContent = `
-        @keyframes fc-magnify {
-          0% { transform: rotate(0deg) scale(1); }
-          50% { transform: rotate(25deg) scale(1.05); }
-          100% { transform: rotate(0deg) scale(1); }
-        }
-        @keyframes fc-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
-        }
-      `;
-      document.head.appendChild(styleSheet);
-    }
 
     document.body.appendChild(overlay);
     return overlay;
