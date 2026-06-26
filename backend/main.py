@@ -1,9 +1,7 @@
 import logging
 import io
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
-from fastapi.security import HTTPBearer
-from fastapi.security.http import HTTPAuthCredentials
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from models import FactCheckRequest, FactCheckResponse, ClaudeFactCheckResponse
 from checker import run_fact_check
@@ -30,15 +28,19 @@ app = FastAPI(title="Fact Checker Backend")
 init_db()
 
 # Security
-security = HTTPBearer()
-
 
 def get_current_user(
-    credentials: HTTPAuthCredentials = Depends(security),
+    request: Request,
     db: Session = Depends(get_db)
 ) -> User:
-    """Dependency to get authenticated user from JWT token"""
-    token = credentials.credentials
+    """Dependency to get authenticated user from JWT token in Authorization header"""
+    # Extract Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    # Extract token
+    token = auth_header[7:]  # Remove "Bearer " prefix
 
     # Verify token
     payload = jwt_manager.verify_token(token)
