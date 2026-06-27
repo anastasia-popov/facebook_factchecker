@@ -84,6 +84,7 @@ async function handleLogin() {
 
     // Poll for tokens immediately and every 500ms for up to 60 seconds
     let attempts = 0;
+    let pollInterval; // Declare outside so it can be cleared in pollFunction
     console.log('Starting token polling for state:', state);
 
     const pollFunction = async () => {
@@ -96,19 +97,19 @@ async function handleLogin() {
 
         if (tokens.ok) {
           console.log('Tokens found! Calling handleOAuthSuccess');
-          clearInterval(pollInterval);
+          if (pollInterval) clearInterval(pollInterval);
           const { access_token, refresh_token } = await tokens.json();
           console.log('Got tokens:', { access_token: access_token?.substring(0, 20) + '...', refresh_token: refresh_token?.substring(0, 20) + '...' });
           handleOAuthSuccess(access_token, refresh_token);
         } else if (attempts > 120) {
           // 120 attempts * 500ms = 60 seconds timeout
-          clearInterval(pollInterval);
+          if (pollInterval) clearInterval(pollInterval);
           throw new Error('Authentication timeout. Please try again.');
         }
       } catch (error) {
         console.log(`Poll error on attempt ${attempts}:`, error.message);
         if (attempts > 120) {
-          clearInterval(pollInterval);
+          if (pollInterval) clearInterval(pollInterval);
           handleOAuthError(error.message);
         }
       }
@@ -119,7 +120,7 @@ async function handleLogin() {
     setTimeout(() => {
       console.log('Starting polls after 1 second delay');
       pollFunction(); // Poll immediately
-      const pollInterval = setInterval(pollFunction, 500); // Then every 500ms
+      pollInterval = setInterval(pollFunction, 500); // Then every 500ms
     }, 1000);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
