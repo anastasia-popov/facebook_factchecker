@@ -84,13 +84,16 @@ async function handleLogin() {
 
     // Poll for tokens every 500ms for up to 60 seconds
     let attempts = 0;
+    console.log('Starting token polling for state:', state);
     const pollInterval = setInterval(async () => {
       attempts++;
 
       try {
         const tokens = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
+        console.log(`Poll attempt ${attempts}: status ${tokens.status}`);
 
         if (tokens.ok) {
+          console.log('Tokens found! Calling handleOAuthSuccess');
           clearInterval(pollInterval);
           const { access_token, refresh_token } = await tokens.json();
           handleOAuthSuccess(access_token, refresh_token);
@@ -100,6 +103,7 @@ async function handleLogin() {
           throw new Error('Authentication timeout. Please try again.');
         }
       } catch (error) {
+        console.log(`Poll error on attempt ${attempts}:`, error.message);
         if (attempts > 120) {
           clearInterval(pollInterval);
           handleOAuthError(error.message);
