@@ -110,12 +110,17 @@ async def google_oauth_callback(
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback (GET request from Google)"""
+    logger.info(f"Google OAuth callback received with state: {state}")
     try:
         # Exchange authorization code for Google token
+        logger.info(f"Exchanging code for token...")
         google_token_data = await google_oauth_manager.exchange_code_for_token(code)
+        logger.info(f"Token exchange successful")
 
         # Get user info from Google
+        logger.info(f"Getting user info from Google...")
         user_info = await google_oauth_manager.get_user_info(google_token_data['access_token'])
+        logger.info(f"Got user info: {user_info['email']}")
 
         # Create or update user
         refresh_token = jwt_manager.create_refresh_token()
@@ -134,12 +139,14 @@ async def google_oauth_callback(
         logger.info(f"User authenticated via Google: {user_info['email']}")
 
         # Store tokens in cache for popup to retrieve
+        logger.info(f"Storing tokens in cache with state: {state}")
         oauth_tokens_cache[state] = {
             'access_token': access_token,
             'refresh_token': refresh_token,
             'token_type': 'bearer',
             'expires_in': 3600
         }
+        logger.info(f"Tokens stored. Cache keys: {list(oauth_tokens_cache.keys())}")
 
         # Return HTML page that closes the window
         html_content = f"""
@@ -192,9 +199,14 @@ async def google_oauth_callback(
 @app.get("/auth/google/get-tokens")
 async def get_oauth_tokens(state: str):
     """Retrieve tokens that were stored during OAuth callback"""
+    logger.info(f"get_oauth_tokens called with state: {state}")
+    logger.info(f"Cache contents: {list(oauth_tokens_cache.keys())}")
+
     if state not in oauth_tokens_cache:
+        logger.warning(f"State {state} not found in cache")
         raise HTTPException(status_code=404, detail="Tokens not found. Please try logging in again.")
 
+    logger.info(f"Found tokens for state {state}, returning")
     tokens = oauth_tokens_cache.pop(state)  # Remove from cache after retrieval
     return TokenResponse(**tokens)
 

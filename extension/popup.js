@@ -114,11 +114,13 @@ async function handleLogin() {
       }
     };
 
-    // Poll immediately first
-    pollFunction();
-
-    // Then poll every 500ms
-    const pollInterval = setInterval(pollFunction, 500);
+    // Wait 1 second for OAuth callback to complete, then start polling
+    // (OAuth redirect back to our callback takes time)
+    setTimeout(() => {
+      console.log('Starting polls after 1 second delay');
+      pollFunction(); // Poll immediately
+      const pollInterval = setInterval(pollFunction, 500); // Then every 500ms
+    }, 1000);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
     googleBtn.disabled = false;
