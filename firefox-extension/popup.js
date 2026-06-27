@@ -9,13 +9,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializePopup() {
   const auth = await chrome.storage.local.get('auth');
+  console.log('Popup init - auth data:', auth);
 
   if (auth.auth?.isAuthenticated) {
     // Show profile panel
+    console.log('User authenticated, loading profile');
     showProfilePanel();
     await loadUserProfile();
   } else {
     // Show login panel
+    console.log('User not authenticated, showing login');
     showLoginPanel();
   }
 }
@@ -115,6 +118,7 @@ async function handleOAuthSuccess(accessToken, refreshToken) {
   const errorDiv = document.getElementById('loginError');
 
   try {
+    console.log('handleOAuthSuccess - storing tokens');
     // Store tokens securely
     await chrome.storage.local.set({
       auth: {
@@ -125,6 +129,10 @@ async function handleOAuthSuccess(accessToken, refreshToken) {
         lastRefresh: Date.now()
       }
     });
+
+    console.log('Tokens stored, verifying...');
+    const stored = await chrome.storage.local.get('auth');
+    console.log('Stored auth data:', stored);
 
     errorDiv.style.display = 'none';
     showProfilePanel();
