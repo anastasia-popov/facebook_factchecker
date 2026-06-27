@@ -452,10 +452,14 @@ async def get_model_setting():
 
 
 @app.post("/settings/model")
-async def set_model_setting(model_key: str):
+async def set_model_setting(request_body: dict):
     """Set Claude model setting"""
     from claude_checker import AVAILABLE_MODELS
     import claude_checker
+
+    model_key = request_body.get('model_key')
+    if not model_key:
+        raise HTTPException(status_code=400, detail="model_key is required")
 
     if model_key not in AVAILABLE_MODELS:
         raise HTTPException(
