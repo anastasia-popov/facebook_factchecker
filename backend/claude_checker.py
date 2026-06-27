@@ -9,7 +9,15 @@ logger = logging.getLogger(__name__)
 
 SERPER_API_URL = "https://google.serper.dev/search"
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
-CLAUDE_MODEL = "claude-opus-4-8"
+
+# Current model - can be changed via settings endpoint
+CURRENT_MODEL = "claude-sonnet-4"
+
+# Available models
+AVAILABLE_MODELS = {
+    "sonnet": "claude-sonnet-4",
+    "opus": "claude-opus-4-8"
+}
 
 # Tool definitions for Claude
 TOOLS = [
@@ -149,7 +157,7 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                         "anthropic-dangerous-direct-browser-access": "true"
                     },
                     json={
-                        "model": CLAUDE_MODEL,
+                        "model": CURRENT_MODEL,
                         "max_tokens": 4000,
                         "tools": TOOLS,
                         "messages": messages
