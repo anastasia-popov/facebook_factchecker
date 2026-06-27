@@ -437,3 +437,36 @@ async def extract_text_from_image(
     except Exception as e:
         logger.error(f"Error in OCR: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=str(e))
+
+
+# ==================== Settings Endpoints ====================
+
+@app.get("/settings/model")
+async def get_model_setting():
+    """Get current Claude model setting"""
+    from claude_checker import CURRENT_MODEL, AVAILABLE_MODELS
+    return {
+        "current_model": CURRENT_MODEL,
+        "available_models": AVAILABLE_MODELS
+    }
+
+
+@app.post("/settings/model")
+async def set_model_setting(model_key: str):
+    """Set Claude model setting"""
+    from claude_checker import AVAILABLE_MODELS
+    import claude_checker
+
+    if model_key not in AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model. Available: {list(AVAILABLE_MODELS.keys())}"
+        )
+
+    claude_checker.CURRENT_MODEL = AVAILABLE_MODELS[model_key]
+    logger.info(f"Model changed to: {AVAILABLE_MODELS[model_key]}")
+
+    return {
+        "current_model": AVAILABLE_MODELS[model_key],
+        "message": f"Model changed to {model_key}"
+    }
