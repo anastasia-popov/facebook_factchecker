@@ -82,11 +82,13 @@ async function handleLogin() {
       height: 600
     });
 
-    // Poll for tokens every 500ms for up to 60 seconds
+    // Poll for tokens immediately and every 500ms for up to 60 seconds
     let attempts = 0;
     console.log('Starting token polling for state:', state);
-    const pollInterval = setInterval(async () => {
+
+    const pollFunction = async () => {
       attempts++;
+      console.log(`Poll attempt ${attempts}`);
 
       try {
         const tokens = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
@@ -96,6 +98,7 @@ async function handleLogin() {
           console.log('Tokens found! Calling handleOAuthSuccess');
           clearInterval(pollInterval);
           const { access_token, refresh_token } = await tokens.json();
+          console.log('Got tokens:', { access_token: access_token?.substring(0, 20) + '...', refresh_token: refresh_token?.substring(0, 20) + '...' });
           handleOAuthSuccess(access_token, refresh_token);
         } else if (attempts > 120) {
           // 120 attempts * 500ms = 60 seconds timeout
@@ -109,7 +112,13 @@ async function handleLogin() {
           handleOAuthError(error.message);
         }
       }
-    }, 500);
+    };
+
+    // Poll immediately first
+    pollFunction();
+
+    // Then poll every 500ms
+    const pollInterval = setInterval(pollFunction, 500);
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
     googleBtn.disabled = false;
