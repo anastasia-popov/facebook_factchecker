@@ -1,8 +1,58 @@
 const BACKEND_URL = 'http://localhost:8000';
 let clipboardImage = null;
 
+// Check if there's a pending OAuth state and continue polling
+function checkPendingOAuth() {
+  const pendingState = localStorage.getItem('oauthState');
+  if (pendingState) {
+    console.log('Found pending OAuth state in localStorage:', pendingState);
+    startOAuthPolling(pendingState);
+  }
+}
+
+function startOAuthPolling(state) {
+  let attempts = 0;
+  let pollInterval;
+  console.log('Starting OAuth polling for state:', state);
+
+  const pollFunction = async () => {
+    attempts++;
+    console.log(`Poll attempt ${attempts}`);
+
+    try {
+      const tokens = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
+      console.log(`Poll attempt ${attempts}: status ${tokens.status}`);
+
+      if (tokens.ok) {
+        console.log('Tokens found! Clearing localStorage and processing tokens');
+        localStorage.removeItem('oauthState');
+        if (pollInterval) clearInterval(pollInterval);
+        const { access_token, refresh_token } = await tokens.json();
+        await handleOAuthSuccess(access_token, refresh_token);
+      } else if (attempts > 120) {
+        localStorage.removeItem('oauthState');
+        if (pollInterval) clearInterval(pollInterval);
+        handleOAuthError('Authentication timeout. Please try again.');
+      }
+    } catch (error) {
+      console.log(`Poll error on attempt ${attempts}:`, error.message);
+      if (attempts > 120) {
+        localStorage.removeItem('oauthState');
+        if (pollInterval) clearInterval(pollInterval);
+        handleOAuthError(error.message);
+      }
+    }
+  };
+
+  // Poll immediately
+  pollFunction();
+  // Then poll every 500ms
+  pollInterval = setInterval(pollFunction, 500);
+}
+
 // Initialize popup on load
 document.addEventListener('DOMContentLoaded', async () => {
+  checkPendingOAuth(); // Check for pending OAuth first
   await initializePopup();
   setupEventListeners();
 });
@@ -74,7 +124,12 @@ async function handleLogin() {
       code_verifier: code_challenge
     });
 
+    // Store polling state in localStorage so it survives popup close/reload
+    localStorage.setItem('oauthState', state);
+    console.log('Stored OAuth state in localStorage:', state);
+
     // Open OAuth popup window
+    console.log('Opening OAuth window...');
     chrome.windows.create({
       url: oauth_url,
       type: 'popup',
@@ -82,46 +137,7 @@ async function handleLogin() {
       height: 600
     });
 
-    // Poll for tokens immediately and every 500ms for up to 60 seconds
-    let attempts = 0;
-    let pollInterval; // Declare outside so it can be cleared in pollFunction
-    console.log('Starting token polling for state:', state);
-
-    const pollFunction = async () => {
-      attempts++;
-      console.log(`Poll attempt ${attempts}`);
-
-      try {
-        const tokens = await fetch(`${BACKEND_URL}/auth/google/get-tokens?state=${encodeURIComponent(state)}`);
-        console.log(`Poll attempt ${attempts}: status ${tokens.status}`);
-
-        if (tokens.ok) {
-          console.log('Tokens found! Calling handleOAuthSuccess');
-          if (pollInterval) clearInterval(pollInterval);
-          const { access_token, refresh_token } = await tokens.json();
-          console.log('Got tokens:', { access_token: access_token?.substring(0, 20) + '...', refresh_token: refresh_token?.substring(0, 20) + '...' });
-          handleOAuthSuccess(access_token, refresh_token);
-        } else if (attempts > 120) {
-          // 120 attempts * 500ms = 60 seconds timeout
-          if (pollInterval) clearInterval(pollInterval);
-          throw new Error('Authentication timeout. Please try again.');
-        }
-      } catch (error) {
-        console.log(`Poll error on attempt ${attempts}:`, error.message);
-        if (attempts > 120) {
-          if (pollInterval) clearInterval(pollInterval);
-          handleOAuthError(error.message);
-        }
-      }
-    };
-
-    // Wait 1 second for OAuth callback to complete, then start polling
-    // (OAuth redirect back to our callback takes time)
-    setTimeout(() => {
-      console.log('Starting polls after 1 second delay');
-      pollFunction(); // Poll immediately
-      pollInterval = setInterval(pollFunction, 500); // Then every 500ms
-    }, 1000);
+    console.log('OAuth window opened. Polling will start when popup reloads.');
   } catch (error) {
     showLoginError('Failed to start login: ' + error.message);
     googleBtn.disabled = false;
