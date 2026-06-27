@@ -226,24 +226,25 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                     len(text_content) < 150  # Very short response likely intro
                 )
 
-                # Check for introductory text FIRST - skip tools if just planning
-                if is_introductory:
-                    logger.debug("Claude provided planning/introductory text, requesting full analysis")
+                # Always execute tools if requested (tool_use requires immediate tool_result)
+                if has_tool_use and tool_results:
+                    logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
+                    messages.append({"role": "user", "content": tool_results})
+                    # Continue the loop to get Claude's next response (will check if it's introductory)
+                # If no tools, check if text is complete analysis or just planning
+                elif has_text and not is_introductory:
+                    # Claude provided substantial text without requesting tools
+                    logger.debug(f"Claude provided final analysis ({len(text_content)} chars), stopping iteration")
+                    break
+                elif has_text and is_introductory:
+                    # Claude provided planning/intro text, ask for actual analysis
+                    logger.debug("Claude provided planning text, requesting full analysis")
                     messages.append({
                         "role": "user",
                         "content": "Please provide the actual fact-checking analysis now. Do not explain what you will do - start with the verdict for each claim."
                     })
-                # If Claude used tools and text is not introductory, send results back and continue
-                elif has_tool_use and tool_results:
-                    logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
-                    messages.append({"role": "user", "content": tool_results})
-                    # Continue the loop to get Claude's next response
-                elif has_text and not has_tool_use:
-                    # Claude provided substantial text without requesting tools
-                    logger.debug(f"Claude provided final analysis ({len(text_content)} chars), stopping iteration")
-                    break
                 else:
-                    # Claude finished without providing text - ask for analysis
+                    # Claude finished without providing text or tools - ask for analysis
                     logger.debug("Claude finished without text or tools, requesting final analysis")
                     messages.append({
                         "role": "user",
