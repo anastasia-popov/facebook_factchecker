@@ -11,11 +11,11 @@ SERPER_API_URL = "https://google.serper.dev/search"
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 
 # Current model - can be changed via settings endpoint
-CURRENT_MODEL = "claude-sonnet-4"
+CURRENT_MODEL = "claude-sonnet-4-6"
 
 # Available models
 AVAILABLE_MODELS = {
-    "sonnet": "claude-sonnet-4",
+    "sonnet": "claude-sonnet-4-6",
     "opus": "claude-opus-4-8"
 }
 
