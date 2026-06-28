@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3003:3003"
+    environment:
+      # API Keys
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      SERPER_API_KEY: ${SERPER_API_KEY}
+      CLAIMBUSTER_API_KEY: ${CLAIMBUSTER_API_KEY}
+
+      # OAuth Configuration
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+
+      # JWT Configuration
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRATION_DAYS: ${REFRESH_TOKEN_EXPIRATION_DAYS:-30}
+
+      # Database
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./factchecker.db}
+
+      # Backend URL
+      BACKEND_URL: ${BACKEND_URL}
+
+    volumes:
+      - ./backend/factchecker.db:/app/factchecker.db
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
