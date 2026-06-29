@@ -27,13 +27,17 @@ echo "Target: $GOLD_USER@$GOLD_SERVER:$GOLD_PATH"
 echo "Branch: $GIT_BRANCH"
 echo ""
 
-# Step 1: Check for uncommitted changes
+# Step 1: Check for uncommitted changes (ignore submodules in .gitignore)
 echo -e "${YELLOW}Step 1: Checking for uncommitted changes...${NC}"
-if [ -n "$(git status --porcelain)" ]; then
+UNCOMITTED=$(git status --porcelain | grep -v '^ M .claude/worktrees' || true)
+if [ -n "$UNCOMITTED" ]; then
     echo -e "${RED}❌ Uncommitted changes detected!${NC}"
     echo "Please commit or stash your changes first:"
     echo "  git add ."
     echo "  git commit -m 'Your message'"
+    echo ""
+    echo "Uncommitted files:"
+    echo "$UNCOMITTED"
     exit 1
 fi
 echo -e "${GREEN}✓ No uncommitted changes${NC}"
