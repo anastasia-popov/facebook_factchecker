@@ -1,5 +1,10 @@
 
 .env
 backend/.env
+.env.prod
+backend/.env.prod
 extension/config.json
+firefox-extension/config.json
 backend/__pycache__/
+*.db
+.claude/worktrees/
