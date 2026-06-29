@@ -86,6 +86,43 @@ async def fetch_and_summarize_url(url: str) -> str:
         return ""
 
 
+def filter_introductory_sentences(text: str) -> str:
+    """Remove introductory/planning sentences from response."""
+    lines = text.split('\n')
+    filtered_lines = []
+
+    introductory_patterns = [
+        'will research',
+        'will search',
+        'let me search',
+        "i'll search",
+        "i'll analyze",
+        'let me fact',
+        'let me analyze',
+        'proceed with',
+        'going through',
+        'checking each',
+        'examining each',
+        'searching for',
+        'looking for',
+    ]
+
+    for line in lines:
+        line_lower = line.lower().strip()
+        # Skip if line is empty or is just planning text
+        if not line_lower:
+            filtered_lines.append(line)
+        elif any(pattern in line_lower for pattern in introductory_patterns) and len(line) < 200:
+            # Skip introductory/planning sentences that are short
+            logger.debug(f"Filtering out planning line: {line[:80]}...")
+            continue
+        else:
+            filtered_lines.append(line)
+
+    result = '\n'.join(filtered_lines).strip()
+    return result
+
+
 async def fact_check_with_claude(text: str) -> str:
     """Send text to Claude for comprehensive fact-checking with web search tools."""
     if not settings.claude_api_key:
@@ -280,6 +317,9 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
             for i, msg in enumerate(messages):
                 logger.error(f"Message {i}: {msg}")
             raise Exception("Claude did not return text analysis")
+
+        # Filter out introductory/planning sentences from the final response
+        final_response = filter_introductory_sentences(final_response)
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response
