@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 GOLD_SERVER="${GOLD_SERVER:-gold}"
 GOLD_USER="${GOLD_USER:-stacy}"
-GOLD_PATH="${GOLD_PATH:-/home/stacy/projects/factchecker}"
+GOLD_PATH="${GOLD_PATH:-~/factchecker}"
 GIT_REMOTE="${GIT_REMOTE:-origin}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
 
