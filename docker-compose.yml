@@ -1,10 +1,28 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-factchecker}
+      POSTGRES_USER: ${POSTGRES_USER:-factchecker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-factchecker}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-factchecker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     ports:
       - "3003:3003"
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       # API Keys
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
@@ -22,14 +40,11 @@ services:
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
       REFRESH_TOKEN_EXPIRATION_DAYS: ${REFRESH_TOKEN_EXPIRATION_DAYS:-30}
 
-      # Database
-      DATABASE_URL: ${DATABASE_URL:-sqlite:///./factchecker.db}
+      # Database (PostgreSQL)
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-factchecker}:${POSTGRES_PASSWORD:-factchecker}@db:5432/${POSTGRES_DB:-factchecker}}
 
       # Backend URL
       BACKEND_URL: ${BACKEND_URL}
-
-    volumes:
-      - ./backend/factchecker.db:/app/factchecker.db
 
     restart: unless-stopped
 
@@ -39,3 +54,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:
