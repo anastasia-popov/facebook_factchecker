@@ -8,3 +8,4 @@ firefox-extension/config.json
 backend/__pycache__/
 *.db
 .claude/worktrees/
+.claude/worktrees/
