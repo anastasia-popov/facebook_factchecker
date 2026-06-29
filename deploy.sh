@@ -73,11 +73,18 @@ echo -e "${YELLOW}Step 4: Deploying to gold server ($GOLD_SERVER)...${NC}"
 echo "Connecting to $GOLD_USER@$GOLD_SERVER..."
 echo ""
 
+# Expand path for SSH
+if [[ "$GOLD_PATH" == "~"* ]]; then
+    GOLD_PATH_EXPANDED=$(ssh "$GOLD_USER@$GOLD_SERVER" "echo $GOLD_PATH" 2>/dev/null)
+else
+    GOLD_PATH_EXPANDED="$GOLD_PATH"
+fi
+
 # Execute deployment on gold server via SSH
 ssh -t "$GOLD_USER@$GOLD_SERVER" << EOFREMOTE
 #!/bin/bash
 set -e
-cd "$GOLD_PATH"
+cd "$GOLD_PATH_EXPANDED"
 
 echo ''
 echo -e '${BLUE}========== Remote Deployment ===========${NC}'
