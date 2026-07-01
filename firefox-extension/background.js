@@ -102,9 +102,9 @@ async function refreshAccessToken() {
     });
 
     if (!response.ok) {
-      // Token refresh failed, user needs to re-login
-      await chrome.storage.local.remove('auth');
-      throw new Error('Session expired. Please log in again via the extension popup.');
+      // Token refresh failed - let the request fail naturally with 401
+      // User stays logged in and can retry. Only explicit logout clears auth.
+      throw new Error('Session expired. Please try again or log in via the extension popup.');
     }
 
     const { access_token } = await response.json();
@@ -116,7 +116,7 @@ async function refreshAccessToken() {
 
     return access_token;
   } catch (error) {
-    await chrome.storage.local.remove('auth');
+    // Don't automatically remove auth - let user decide to logout via popup
     throw error;
   }
 }
