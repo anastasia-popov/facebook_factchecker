@@ -163,6 +163,23 @@
       <span style="margin-right: 6px;">🔍</span> Sign in with Google
     </button>
     <div id="loginError" class="error" style="display: none;"></div>
+
+    <div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin-top: 16px;">
+      <div style="font-weight: 700; color: #050505; margin-bottom: 8px; cursor: pointer; user-select: none;" id="loginSettingsToggle">
+        ⚙️ Backend URL
+      </div>
+      <div id="loginSettingsPanel" style="display: none; margin-top: 8px;">
+        <div class="form-group">
+          <label for="loginBackendUrl">Backend URL</label>
+          <input type="text" id="loginBackendUrl" placeholder="http://localhost:8000" style="font-size: 12px;">
+          <div style="font-size: 11px; color: #65676b; margin-top: 4px;">
+            e.g., http://localhost:8000 or https://your-domain.com
+          </div>
+        </div>
+        <button id="saveLoginBackendUrlBtn" style="font-size: 12px;">Save</button>
+        <div id="loginBackendUrlMessage" style="display: none; margin-top: 8px;"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Profile Panel -->

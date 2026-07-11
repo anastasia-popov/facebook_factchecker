@@ -114,17 +114,32 @@ function setupEventListeners() {
     modelSelect.addEventListener('change', handleModelChange);
   }
 
-  // Settings toggle
-  document.getElementById('settingsToggle').addEventListener('click', () => {
-    const panel = document.getElementById('settingsPanel');
+  // Login panel - Backend settings toggle
+  document.getElementById('loginSettingsToggle').addEventListener('click', () => {
+    const panel = document.getElementById('loginSettingsPanel');
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     if (panel.style.display === 'block') {
-      loadBackendUrlInput();
+      loadLoginBackendUrlInput();
     }
   });
 
-  // Save backend URL
-  document.getElementById('saveBackendUrlBtn').addEventListener('click', handleSaveBackendUrl);
+  // Login panel - Save backend URL
+  document.getElementById('saveLoginBackendUrlBtn').addEventListener('click', handleSaveLoginBackendUrl);
+
+  // Profile panel - Settings toggle
+  const settingsToggle = document.getElementById('settingsToggle');
+  if (settingsToggle) {
+    settingsToggle.addEventListener('click', () => {
+      const panel = document.getElementById('settingsPanel');
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      if (panel.style.display === 'block') {
+        loadBackendUrlInput();
+      }
+    });
+
+    // Profile panel - Save backend URL
+    document.getElementById('saveBackendUrlBtn').addEventListener('click', handleSaveBackendUrl);
+  }
 }
 
 // ==================== OAuth Login ====================
@@ -304,6 +319,44 @@ async function refreshAccessToken() {
 }
 
 // ==================== Backend URL Configuration ====================
+
+async function loadLoginBackendUrlInput() {
+  const settings = await chrome.storage.local.get('backendUrl');
+  const input = document.getElementById('loginBackendUrl');
+  input.value = settings.backendUrl || 'http://localhost:8000';
+}
+
+async function handleSaveLoginBackendUrl() {
+  const input = document.getElementById('loginBackendUrl');
+  const url = input.value.trim();
+  const msgDiv = document.getElementById('loginBackendUrlMessage');
+
+  if (!url) {
+    showLoginBackendUrlMessage('URL cannot be empty', 'error');
+    return;
+  }
+
+  try {
+    new URL(url);
+  } catch (e) {
+    showLoginBackendUrlMessage('Invalid URL format', 'error');
+    return;
+  }
+
+  await chrome.storage.local.set({ backendUrl: url });
+  BACKEND_URL = url;
+  showLoginBackendUrlMessage('Backend URL saved!', 'success');
+}
+
+function showLoginBackendUrlMessage(message, type) {
+  const msgDiv = document.getElementById('loginBackendUrlMessage');
+  msgDiv.textContent = message;
+  msgDiv.className = type;
+  msgDiv.style.display = 'block';
+  setTimeout(() => {
+    msgDiv.style.display = 'none';
+  }, 3000);
+}
 
 async function loadBackendUrlInput() {
   const settings = await chrome.storage.local.get('backendUrl');
