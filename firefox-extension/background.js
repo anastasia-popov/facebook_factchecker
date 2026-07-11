@@ -148,9 +148,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ result });
       })
       .catch(error => {
-        sendResponse({ error: error.message });
+        // Check if it's an authentication error
+        if (error.message.includes('Not authenticated') || error.message.includes('not authenticated')) {
+          sendResponse({ error: error.message, errorType: 'AUTH_REQUIRED' });
+        } else {
+          sendResponse({ error: error.message });
+        }
       });
     return true; // Keep channel open for async response
+  } else if (request.action === 'openPopup') {
+    // Open the extension popup
+    chrome.action.openPopup(() => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
 

@@ -770,6 +770,90 @@
     document.body.appendChild(overlay);
   }
 
+  function showLoginPrompt() {
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-overlay fc-overlay-login';
+    overlay.setAttribute('data-fc-overlay', 'true');
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      background: #FFFFFF !important;
+      border: 2px solid #0891B2 !important;
+      border-radius: 12px !important;
+      padding: 32px !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      font-size: 14px !important;
+      color: #374151 !important;
+      z-index: 999999 !important;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.15) !important;
+      max-width: 420px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      text-align: center !important;
+      gap: 20px !important;
+    `;
+    overlay.innerHTML = `
+      <div style="font-size: 48px !important;">🔐</div>
+      <div style="font-size: 18px !important; font-weight: 700 !important; color: #0891B2 !important;">Sign In Required</div>
+      <div style="font-size: 14px !important; color: #6B7280 !important; line-height: 1.5 !important;">
+        You need to be logged in to fact-check posts. Click the button below to open the extension and sign in with your Google account.
+      </div>
+      <button id="fc-login-btn" style="
+        background-color: #0891B2 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 12px 28px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: background-color 0.2s !important;
+        width: 100% !important;
+      ">
+        📱 Open Extension & Sign In
+      </button>
+      <button class="fc-close" aria-label="Close" style="
+        position: absolute !important;
+        top: 12px !important;
+        right: 12px !important;
+        background: none !important;
+        border: none !important;
+        cursor: pointer !important;
+        font-size: 20px !important;
+        color: #D1D5DB !important;
+        padding: 4px !important;
+        transition: color 0.2s !important;
+      ">✕</button>
+    `;
+
+    const loginBtn = overlay.querySelector('#fc-login-btn');
+    loginBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'openPopup' }, () => {
+        overlay.remove();
+      });
+    });
+    loginBtn.addEventListener('mouseover', () => {
+      loginBtn.style.backgroundColor = '#0a6b8a !important';
+    });
+    loginBtn.addEventListener('mouseout', () => {
+      loginBtn.style.backgroundColor = '#0891B2 !important';
+    });
+
+    const closeBtn = overlay.querySelector('.fc-close');
+    closeBtn.addEventListener('click', () => overlay.remove());
+    closeBtn.addEventListener('mouseover', () => {
+      closeBtn.style.color = '#6B7280 !important';
+    });
+    closeBtn.addEventListener('mouseout', () => {
+      closeBtn.style.color = '#D1D5DB !important';
+    });
+
+    document.body.appendChild(overlay);
+  }
+
   async function handleFactCheck(article, btn) {
     btn.disabled = true;
     btn.textContent = 'Checking…';
@@ -808,6 +892,8 @@
 
           if (!response) {
             showError(article, 'No response from service worker');
+          } else if (response.errorType === 'AUTH_REQUIRED') {
+            showLoginPrompt();
           } else if (response.error) {
             showError(article, response.error);
           } else if (response.result) {
