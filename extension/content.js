@@ -1,4 +1,5 @@
 (function () {
+  console.log('[FC] Content script loaded!');
   const BACKEND_URL = 'http://localhost:8000';
 
   // Screenshot/rectangle selection mode
@@ -259,8 +260,8 @@
   }
 
   function isDetailPage() {
-    const url = window.location.href;
-    return url.includes('/permalink/') || url.includes('/posts/');
+    // Allow fact-checking on any page
+    return true;
   }
 
   function reverseImageSearch(imageUrl, service = 'tineye') {
@@ -855,6 +856,7 @@
   }
 
   async function handleFactCheck(article, btn) {
+    console.log('[FC Content] handleFactCheck called!');
     btn.disabled = true;
     btn.textContent = 'Checking…';
 
@@ -879,6 +881,7 @@
       showLoadingAnimation();
 
       // Send message to background service worker to handle Claude API call
+      console.log('[FC Content] Sending message to background...');
       chrome.runtime.sendMessage(
         {
           action: 'factCheckWithClaude',
@@ -886,15 +889,20 @@
           imageUrls: imageUrls
         },
         (response) => {
+          console.log('[FC Content] Got callback response:', response);
 
           // Remove loading animation
           removeLoadingAnimation();
 
+          console.log('[FC Content] Response:', response);
+
           if (!response) {
             showError(article, 'No response from service worker');
           } else if (response.errorType === 'AUTH_REQUIRED') {
+            console.log('[FC Content] Showing login prompt');
             showLoginPrompt();
           } else if (response.error) {
+            console.log('[FC Content] Showing error:', response.error);
             showError(article, response.error);
           } else if (response.result) {
             showClaudeResults(article, response.result, text);
@@ -915,13 +923,16 @@
   }
 
   function injectButton() {
+    console.log('[FC Content] injectButton called');
 
     if (!isDetailPage()) {
+      console.log('[FC Content] Not a detail page');
       return;
     }
 
     // Find the main post container
     const article = document.querySelector('[role="article"]');
+    console.log('[FC Content] Found article:', !!article);
     if (!article) {
       return;
     }
@@ -1081,7 +1092,11 @@
           }
         })
         .catch(error => {
-          showError(document.body, `OCR Error: ${error.message}`);
+          if (error.message.includes('Not authenticated')) {
+            showLoginPrompt();
+          } else {
+            showError(document.body, `OCR Error: ${error.message}`);
+          }
         });
     } else if (request.action === 'findImageForOCR') {
       // Try to get image from the last clicked element (handles divs with background images too)
@@ -1128,7 +1143,9 @@
             return;
           }
 
-          if (response.error) {
+          if (response.errorType === 'AUTH_REQUIRED') {
+            showLoginPrompt();
+          } else if (response.error) {
             showError(container, response.error);
           } else if (response.result) {
             showClaudeResults(container, response.result, text);
@@ -1140,4 +1157,20 @@
       showError(container, `Error: ${e.message}`);
     }
   }
+
+  // Button injection disabled - user prefers context menu only
+  // Uncomment below to re-enable the red "Fact Check" button
+  /*
+  console.log('[FC Content] Initializing...');
+  injectButton();
+
+  const observer = new MutationObserver(() => {
+    injectButton();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+  */
 })();

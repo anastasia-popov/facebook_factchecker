@@ -145,13 +145,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'factCheckWithClaude') {
     handleFactCheck(request.text)
       .then(result => {
+        console.log('[FC] Sending result:', result);
         sendResponse({ result });
       })
       .catch(error => {
+        console.log('[FC] Error caught:', error.message);
         // Check if it's an authentication error
         if (error.message.includes('Not authenticated') || error.message.includes('not authenticated')) {
-          sendResponse({ error: error.message, errorType: 'AUTH_REQUIRED' });
+          console.log('[FC] Detected AUTH_REQUIRED');
+          const response = { error: error.message, errorType: 'AUTH_REQUIRED' };
+          console.log('[FC] Sending response:', response);
+          sendResponse(response);
         } else {
+          console.log('[FC] Regular error:', error.message);
           sendResponse({ error: error.message });
         }
       });

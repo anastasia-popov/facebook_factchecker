@@ -259,8 +259,8 @@
   }
 
   function isDetailPage() {
-    const url = window.location.href;
-    return url.includes('/permalink/') || url.includes('/posts/');
+    // Allow fact-checking on any page
+    return true;
   }
 
   function reverseImageSearch(imageUrl, service = 'tineye') {
@@ -1081,7 +1081,11 @@
           }
         })
         .catch(error => {
-          showError(document.body, `OCR Error: ${error.message}`);
+          if (error.message.includes('Not authenticated')) {
+            showLoginPrompt();
+          } else {
+            showError(document.body, `OCR Error: ${error.message}`);
+          }
         });
     } else if (request.action === 'findImageForOCR') {
       // Try to get image from the last clicked element (handles divs with background images too)
