@@ -6,6 +6,6 @@ backend/.env.prod
 extension/config.json
 firefox-extension/config.json
 backend/__pycache__/
+backend/.venv/
 *.db
-.claude/worktrees/
 .claude/worktrees/
