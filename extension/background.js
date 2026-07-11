@@ -62,7 +62,23 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-const BACKEND_URL = 'http://localhost:8000';
+let BACKEND_URL = 'http://localhost:8000';
+
+// Load backend URL from storage on startup
+chrome.runtime.onInstalled.addListener(async () => {
+  const settings = await chrome.storage.local.get('backendUrl');
+  if (settings.backendUrl) {
+    BACKEND_URL = settings.backendUrl;
+  }
+});
+
+// Also load on every script load
+(async () => {
+  const settings = await chrome.storage.local.get('backendUrl');
+  if (settings.backendUrl) {
+    BACKEND_URL = settings.backendUrl;
+  }
+})();
 
 // ==================== Auth Token Management ====================
 

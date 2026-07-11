@@ -1,5 +1,15 @@
-const BACKEND_URL = 'http://localhost:8000';
+let BACKEND_URL = 'http://localhost:8000';
 let clipboardImage = null;
+
+// Load backend URL from storage
+async function loadBackendUrl() {
+  const settings = await chrome.storage.local.get('backendUrl');
+  if (settings.backendUrl) {
+    BACKEND_URL = settings.backendUrl;
+  }
+}
+
+loadBackendUrl();
 
 // Check if there's a pending OAuth state and continue polling
 function checkPendingOAuth() {
@@ -95,6 +105,18 @@ function setupEventListeners() {
 
   // Clipboard paste
   document.getElementById('imageUrl').addEventListener('paste', handleImagePaste);
+
+  // Settings toggle
+  document.getElementById('settingsToggle').addEventListener('click', () => {
+    const panel = document.getElementById('settingsPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') {
+      loadBackendUrlInput();
+    }
+  });
+
+  // Save backend URL
+  document.getElementById('saveBackendUrlBtn').addEventListener('click', handleSaveBackendUrl);
 }
 
 // ==================== OAuth Login ====================
@@ -257,18 +279,18 @@ async function refreshAccessToken() {
       throw new Error('Token refresh failed');
     }
 
-    const { access_token } = await response.json();
+    const { access_token, refresh_token } = await response.json();
 
-    // Update stored token
+    // Update stored tokens
     auth.auth.accessToken = access_token;
+    auth.auth.refreshToken = refresh_token;
     auth.auth.accessTokenExpiry = Date.now() + (60 * 60 * 1000);
     await chrome.storage.local.set({ auth });
 
     return access_token;
   } catch (error) {
-    // Clear auth and show login screen
-    await chrome.storage.local.remove('auth');
-    showLoginPanel();
+    // Don't auto-logout - user stays logged in and can retry
+    // Only explicit logout clears auth
     throw error;
   }
 }
@@ -292,6 +314,46 @@ async function handleLogout() {
   clipboardImage = null;
   document.getElementById('imageUrl').value = '';
   showLoginPanel();
+}
+
+// ==================== Backend URL Configuration ====================
+
+async function loadBackendUrlInput() {
+  const settings = await chrome.storage.local.get('backendUrl');
+  const input = document.getElementById('backendUrl');
+  input.value = settings.backendUrl || 'http://localhost:8000';
+}
+
+async function handleSaveBackendUrl() {
+  const input = document.getElementById('backendUrl');
+  const url = input.value.trim();
+  const msgDiv = document.getElementById('backendUrlMessage');
+
+  if (!url) {
+    showBackendUrlMessage('URL cannot be empty', 'error');
+    return;
+  }
+
+  try {
+    new URL(url);
+  } catch (e) {
+    showBackendUrlMessage('Invalid URL format', 'error');
+    return;
+  }
+
+  await chrome.storage.local.set({ backendUrl: url });
+  BACKEND_URL = url;
+  showBackendUrlMessage('Backend URL saved! Reload the extension to apply.', 'success');
+}
+
+function showBackendUrlMessage(message, type) {
+  const msgDiv = document.getElementById('backendUrlMessage');
+  msgDiv.textContent = message;
+  msgDiv.className = type;
+  msgDiv.style.display = 'block';
+  setTimeout(() => {
+    msgDiv.style.display = 'none';
+  }, 3000);
 }
 
 // ==================== Image Extraction & Fact-Checking ====================
