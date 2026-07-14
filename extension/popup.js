@@ -330,11 +330,17 @@ async function loadLoginBackendUrlInput() {
 
 async function handleSaveLoginBackendUrl() {
   const input = document.getElementById('loginBackendUrl');
-  const url = input.value.trim();
+  let url = input.value.trim();
   const msgDiv = document.getElementById('loginBackendUrlMessage');
 
   if (!url) {
     showLoginBackendUrlMessage('URL cannot be empty', 'error');
+    return;
+  }
+
+  // Ensure URL has explicit protocol
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    showLoginBackendUrlMessage('URL must start with http:// or https://', 'error');
     return;
   }
 
@@ -368,11 +374,17 @@ async function loadBackendUrlInput() {
 
 async function handleSaveBackendUrl() {
   const input = document.getElementById('backendUrl');
-  const url = input.value.trim();
+  let url = input.value.trim();
   const msgDiv = document.getElementById('backendUrlMessage');
 
   if (!url) {
     showBackendUrlMessage('URL cannot be empty', 'error');
+    return;
+  }
+
+  // Ensure URL has explicit protocol
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    showBackendUrlMessage('URL must start with http:// or https://', 'error');
     return;
   }
 
