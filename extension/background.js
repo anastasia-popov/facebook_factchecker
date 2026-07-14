@@ -123,12 +123,13 @@ async function refreshAccessToken() {
       throw new Error('Session expired. Please try again or log in via the extension popup.');
     }
 
-    const { access_token, refresh_token } = await response.json();
+    const { access_token, refresh_token, refresh_token_expires_in } = await response.json();
 
-    // Update stored tokens
+    // Update stored tokens with sliding window refresh
     auth.auth.accessToken = access_token;
     auth.auth.refreshToken = refresh_token;
     auth.auth.accessTokenExpiry = Date.now() + (60 * 60 * 1000); // 1 hour
+    auth.auth.refreshTokenExpiry = Date.now() + (refresh_token_expires_in * 1000); // Extends by 365 days
     await chrome.storage.local.set({ auth });
 
     return access_token;

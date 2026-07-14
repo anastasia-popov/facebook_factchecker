@@ -144,7 +144,8 @@ async def google_oauth_callback(
             'access_token': access_token,
             'refresh_token': refresh_token,
             'token_type': 'bearer',
-            'expires_in': 3600
+            'expires_in': 3600,
+            'refresh_token_expires_in': 31536000
         }
         logger.info(f"Tokens stored. Cache keys: {list(oauth_tokens_cache.keys())}")
 
@@ -245,7 +246,8 @@ async def refresh_access_token(
         return TokenResponse(
             access_token=access_token,
             refresh_token=new_refresh_token,
-            expires_in=settings.jwt_expiration_minutes * 60
+            expires_in=settings.jwt_expiration_minutes * 60,
+            refresh_token_expires_in=31536000
         )
     except HTTPException:
         raise

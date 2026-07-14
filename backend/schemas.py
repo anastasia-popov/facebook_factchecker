@@ -29,6 +29,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int = 3600
+    refresh_token_expires_in: int = 31536000  # 365 days in seconds
 
 
 class RefreshTokenRequest(BaseModel):

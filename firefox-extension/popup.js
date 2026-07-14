@@ -37,8 +37,8 @@ function startOAuthPolling(state) {
         console.log('Tokens found! Clearing localStorage and processing tokens');
         localStorage.removeItem('oauthState');
         if (pollInterval) clearInterval(pollInterval);
-        const { access_token, refresh_token } = await tokens.json();
-        await handleOAuthSuccess(access_token, refresh_token);
+        const { access_token, refresh_token, refresh_token_expires_in } = await tokens.json();
+        await handleOAuthSuccess(access_token, refresh_token, refresh_token_expires_in);
       } else if (attempts > 120) {
         localStorage.removeItem('oauthState');
         if (pollInterval) clearInterval(pollInterval);
@@ -182,7 +182,7 @@ async function handleLogin() {
 }
 
 
-async function handleOAuthSuccess(accessToken, refreshToken) {
+async function handleOAuthSuccess(accessToken, refreshToken, refreshTokenExpiresIn = 31536000) {
   const googleBtn = document.getElementById('googleLoginBtn');
   const errorDiv = document.getElementById('loginError');
 
@@ -194,6 +194,7 @@ async function handleOAuthSuccess(accessToken, refreshToken) {
         accessToken: accessToken,
         refreshToken: refreshToken,
         accessTokenExpiry: Date.now() + (60 * 60 * 1000), // 1 hour
+        refreshTokenExpiry: Date.now() + (refreshTokenExpiresIn * 1000), // From server
         isAuthenticated: true,
         lastRefresh: Date.now()
       }
@@ -294,12 +295,13 @@ async function refreshAccessToken() {
       throw new Error('Token refresh failed');
     }
 
-    const { access_token, refresh_token } = await response.json();
+    const { access_token, refresh_token, refresh_token_expires_in } = await response.json();
 
-    // Update stored tokens
+    // Update stored tokens with sliding window refresh
     auth.auth.accessToken = access_token;
     auth.auth.refreshToken = refresh_token;
     auth.auth.accessTokenExpiry = Date.now() + (60 * 60 * 1000);
+    auth.auth.refreshTokenExpiry = Date.now() + (refresh_token_expires_in * 1000); // Extends by 365 days
     await chrome.storage.local.set({ auth });
 
     return access_token;
