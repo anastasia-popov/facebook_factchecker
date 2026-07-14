@@ -223,7 +223,9 @@
       const formData = new FormData();
       formData.append('file', imageBlob, 'image.png');
 
-      const ocrResponse = await fetch(`${BACKEND_URL}/ocr`, {
+      const ocrUrl = `${BACKEND_URL}/ocr`;
+      console.log('[FC] Making OCR request to:', ocrUrl);
+      const ocrResponse = await fetch(ocrUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${auth.auth.accessToken}`
