@@ -221,10 +221,14 @@
 
       // Send OCR request to background service worker to bypass mixed content policy
       console.log('[FC] Sending OCR request to background worker for:', imageUrl);
+
+      // Convert Blob to ArrayBuffer for message passing
+      const arrayBuffer = await imageBlob.arrayBuffer();
+
       const ocrResponse = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           action: 'performOCR',
-          imageData: imageBlob,
+          imageData: Array.from(new Uint8Array(arrayBuffer)),
           isUrl: false
         }, (response) => {
           if (chrome.runtime.lastError) {

@@ -170,8 +170,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ result });
       })
       .catch(error => {
-        console.log('[FC] OCR Error:', error.message);
-        sendResponse({ error: error.message });
+        console.log('[FC] OCR Error object:', error);
+        console.log('[FC] OCR Error message:', error?.message || String(error));
+        sendResponse({ error: error?.message || String(error) });
       });
     return true;
   } else if (request.action === 'openPopup') {
@@ -277,10 +278,12 @@ async function handleOCR(imageData, isUrl) {
 
       return await response.json();
     } else {
-      // Handle blob data
+      // Convert array back to Blob
+      const blob = new Blob([new Uint8Array(imageData)], { type: 'image/png' });
       const formData = new FormData();
-      formData.append('file', imageData);
+      formData.append('file', blob, 'image.png');
 
+      console.log('[FC] Making OCR POST to:', `${BACKEND_URL}/ocr`);
       const response = await fetch(`${BACKEND_URL}/ocr`, {
         method: 'POST',
         headers: {
@@ -289,14 +292,17 @@ async function handleOCR(imageData, isUrl) {
         body: formData
       });
 
+      console.log('[FC] OCR response status:', response.status);
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'OCR failed');
+        throw new Error(error.detail || `OCR failed with status ${response.status}`);
       }
 
       return await response.json();
     }
   } catch (error) {
+    console.log('[FC] handleOCR error:', error);
     throw error;
   }
 }
