@@ -1,6 +1,14 @@
 (function () {
   console.log('[FC] Content script loaded!');
-  const BACKEND_URL = 'http://localhost:8000';
+  let BACKEND_URL = 'http://localhost:8000';
+
+  // Load backend URL from storage
+  chrome.storage.local.get('backendUrl', (result) => {
+    if (result.backendUrl) {
+      BACKEND_URL = result.backendUrl;
+      console.log('[FC] Backend URL loaded from storage:', BACKEND_URL);
+    }
+  });
 
   // Screenshot/rectangle selection mode
   let screenshotMode = false;
