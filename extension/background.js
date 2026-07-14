@@ -163,6 +163,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
     return true; // Keep channel open for async response
+  } else if (request.action === 'performOCR') {
+    handleOCR(request.imageData, request.isUrl)
+      .then(result => {
+        console.log('[FC] OCR result:', result);
+        sendResponse({ result });
+      })
+      .catch(error => {
+        console.log('[FC] OCR Error:', error.message);
+        sendResponse({ error: error.message });
+      });
+    return true;
   } else if (request.action === 'openPopup') {
     // Open the extension popup
     chrome.action.openPopup(() => {
@@ -235,6 +246,56 @@ async function handleFactCheck(text) {
     }
 
     return analysis;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ==================== OCR API ====================
+
+async function handleOCR(imageData, isUrl) {
+  try {
+    const accessToken = await ensureValidToken();
+
+    if (isUrl) {
+      // Handle URL-based image
+      const response = await fetch(`${BACKEND_URL}/ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          image_url: imageData
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'OCR failed');
+      }
+
+      return await response.json();
+    } else {
+      // Handle blob data
+      const formData = new FormData();
+      formData.append('file', imageData);
+
+      const response = await fetch(`${BACKEND_URL}/ocr`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'OCR failed');
+      }
+
+      return await response.json();
+    }
   } catch (error) {
     throw error;
   }

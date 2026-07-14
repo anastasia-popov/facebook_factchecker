@@ -218,37 +218,30 @@
         throw new Error('Session expired. Please log in again via the extension popup.');
       }
 
-      // Upload to backend for OCR
-      const formData = new FormData();
-      formData.append('file', imageBlob, 'image.png');
-
-      const ocrUrl = `${BACKEND_URL}/ocr`;
-      console.log('[FC] Making OCR request to:', ocrUrl);
-      const ocrResponse = await fetch(ocrUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${auth.auth.accessToken}`
-        },
-        body: formData
+      // Send OCR request to background service worker to bypass mixed content policy
+      console.log('[FC] Sending OCR request to background worker for:', imageUrl);
+      const ocrResponse = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          action: 'performOCR',
+          imageData: imageBlob,
+          isUrl: false
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        });
       });
 
-      // Handle authentication errors
-      if (ocrResponse.status === 401) {
-        throw new Error('Authentication failed. Please log in again via the extension popup.');
+      if (ocrResponse.error) {
+        if (ocrResponse.error.includes('Rate limit exceeded')) {
+          throw new Error(ocrResponse.error);
+        }
+        throw new Error(`OCR Error: ${ocrResponse.error}`);
       }
 
-      // Handle rate limit
-      if (ocrResponse.status === 429) {
-        const error = await ocrResponse.json();
-        throw new Error(`Rate limit exceeded: ${error.detail || 'Daily or monthly quota exceeded'}`);
-      }
-
-      if (!ocrResponse.ok) {
-        const error = await ocrResponse.json();
-        throw new Error(`OCR Error: ${error.detail || 'Unknown error'}`);
-      }
-
-      const ocrResult = await ocrResponse.json();
+      const ocrResult = ocrResponse.result;
       const extractedText = ocrResult.text;
 
       if (statusDiv && statusDiv.parentNode) {
