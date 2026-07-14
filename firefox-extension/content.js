@@ -212,13 +212,8 @@
         imageBlob = await response.blob();
       }
 
-      // Check token expiry
-      if (Date.now() >= auth.auth.accessTokenExpiry) {
-        // Token expired, need to refresh
-        throw new Error('Session expired. Please log in again via the extension popup.');
-      }
-
       // Send OCR request to background service worker to bypass mixed content policy
+      // Token refresh is handled automatically by the background worker
       console.log('[FC] Sending OCR request to background worker for:', imageUrl);
 
       // Convert Blob to ArrayBuffer for message passing
