@@ -9,3 +9,4 @@ backend/__pycache__/
 backend/.venv/
 *.db
 .claude/worktrees/
+backend/.env.bak
