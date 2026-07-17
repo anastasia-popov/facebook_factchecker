@@ -70,8 +70,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initializePopup() {
   const auth = await chrome.storage.local.get('auth');
   console.log('Popup init - auth data:', auth);
+  console.log('Popup init - isAuthenticated value:', auth.auth?.isAuthenticated, 'type:', typeof auth.auth?.isAuthenticated);
 
-  if (auth.auth?.isAuthenticated) {
+  if (auth.auth && auth.auth.isAuthenticated === true) {
     // Show profile panel
     console.log('User authenticated, loading profile');
     showProfilePanel();
@@ -238,7 +239,7 @@ function showLoginError(message) {
 async function loadUserProfile() {
   const auth = await chrome.storage.local.get('auth');
 
-  if (!auth.auth?.isAuthenticated) {
+  if (!auth.auth || auth.auth.isAuthenticated !== true) {
     showLoginPanel();
     return;
   }
@@ -270,7 +271,11 @@ async function loadUserProfile() {
     displayProfile(profile);
   } catch (error) {
     console.error('Failed to load profile:', error);
-    showLoginPanel();
+    // Keep user logged in - errors fetching profile shouldn't log them out
+    // Just show profile panel without quota data
+    if (auth.auth && auth.auth.isAuthenticated === true) {
+      console.log('Keeping user logged in despite profile fetch error');
+    }
   }
 }
 
