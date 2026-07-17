@@ -130,7 +130,7 @@ async function refreshAccessToken() {
     auth.auth.refreshToken = refresh_token;
     auth.auth.accessTokenExpiry = Date.now() + (60 * 60 * 1000); // 1 hour
     auth.auth.refreshTokenExpiry = Date.now() + (refresh_token_expires_in * 1000); // Extends by 365 days
-    await chrome.storage.local.set({ auth });
+    await chrome.storage.local.set(auth);
 
     return access_token;
   } catch (error) {
