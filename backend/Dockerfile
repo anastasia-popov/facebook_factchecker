@@ -18,5 +18,5 @@ COPY . .
 # Expose port
 EXPOSE 3003
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3003"]
+# Run the application with SSL
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3003", "--ssl-keyfile=/app/private.key", "--ssl-certfile=/app/certificate.crt"]
