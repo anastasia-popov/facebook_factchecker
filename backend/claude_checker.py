@@ -1,7 +1,9 @@
 import httpx
 import json
 import logging
+import os
 import re
+from datetime import datetime
 from typing import Optional, Any
 from config import settings
 
@@ -9,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 SERPER_API_URL = "https://google.serper.dev/search"
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
+
+# Where full Claude conversations get dumped, one entry per fact-check request.
+CONVERSATION_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+CONVERSATION_LOG_PATH = os.path.join(CONVERSATION_LOG_DIR, "claude_conversations.log")
 
 # Current model - can be changed via settings endpoint
 CURRENT_MODEL = "claude-sonnet-4-6"
@@ -126,6 +132,59 @@ def filter_introductory_sentences(text: str) -> str:
 
     result = '\n'.join(filtered_lines).strip()
     return result
+
+
+def _format_message_for_log(msg: dict) -> str:
+    """Render a single Claude API message (string or content-block-list) as readable text."""
+    role = msg.get("role", "unknown").upper()
+    content = msg.get("content", "")
+
+    if isinstance(content, str):
+        return f"[{role}]\n{content}"
+
+    parts = []
+    for block in content:
+        block_type = block.get("type")
+        if block_type == "text":
+            parts.append(block.get("text", ""))
+        elif block_type == "tool_use":
+            parts.append(f"[TOOL CALL: {block.get('name')}({json.dumps(block.get('input', {}))})]")
+        elif block_type == "tool_result":
+            parts.append(f"[TOOL RESULT]\n{block.get('content', '')}")
+        else:
+            parts.append(json.dumps(block))
+    return f"[{role}]\n" + "\n".join(parts)
+
+
+def dump_conversation(messages: list, final_response: str = None, error: str = None) -> None:
+    """Append the full Claude conversation to a log file.
+
+    Each call's transcript is appended as one entry, separated from the
+    previous entry by a double '----------' separator line.
+    """
+    try:
+        os.makedirs(CONVERSATION_LOG_DIR, exist_ok=True)
+
+        lines = [f"Timestamp: {datetime.utcnow().isoformat()}Z", f"Model: {CURRENT_MODEL}", ""]
+        for msg in messages:
+            lines.append(_format_message_for_log(msg))
+            lines.append("")
+
+        if final_response:
+            lines.append("[FINAL RESPONSE RETURNED TO USER]")
+            lines.append(final_response)
+            lines.append("")
+
+        if error:
+            lines.append(f"[ERROR] {error}")
+            lines.append("")
+
+        with open(CONVERSATION_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+            f.write("\n----------\n----------\n\n")
+    except Exception as log_error:
+        # A logging failure must never break the fact-check flow
+        logger.error(f"Failed to write conversation log: {log_error}")
 
 
 async def fact_check_with_claude(text: str) -> str:
@@ -344,6 +403,7 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
             raise Exception("Claude returned only introductory text, no actual analysis")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
+        dump_conversation(messages, final_response=final_response)
         return final_response
 
     except httpx.TimeoutException as e:
@@ -352,8 +412,12 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
         if len(messages) > 1:
             for content_block in messages[-1].get("content", []):
                 if content_block.get("type") == "text":
-                    return content_block.get("text", "Analysis timed out. Partial results above.")
+                    partial_text = content_block.get("text", "Analysis timed out. Partial results above.")
+                    dump_conversation(messages, final_response=partial_text, error="TIMEOUT (partial result returned)")
+                    return partial_text
+        dump_conversation(messages, error="TIMEOUT (no partial result available)")
         raise Exception("Fact-checking request timed out. Please try again.")
     except Exception as e:
         logger.error(f"Claude fact-check request failed: {e}", exc_info=True)
+        dump_conversation(messages, error=str(e))
         raise

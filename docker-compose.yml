@@ -23,6 +23,7 @@ services:
     volumes:
       - ./backend/certificate.crt:/app/certificate.crt:ro
       - ./backend/private.key:/app/private.key:ro
+      - ./backend/logs:/app/logs
     depends_on:
       db:
         condition: service_healthy

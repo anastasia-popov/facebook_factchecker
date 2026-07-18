@@ -11,3 +11,4 @@ backend/.venv/
 *.db.backup
 .claude/worktrees/
 backend/.env.bak
+backend/logs/
