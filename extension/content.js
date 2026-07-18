@@ -686,9 +686,9 @@
       const deltaX = e.clientX - dragStartX;
       const deltaY = e.clientY - dragStartY;
 
-      overlay.style.left = (overlayStartLeft + deltaX) + 'px !important';
-      overlay.style.top = (overlayStartTop + deltaY) + 'px !important';
-      overlay.style.transform = 'none !important';
+      overlay.style.setProperty('left', (overlayStartLeft + deltaX) + 'px', 'important');
+      overlay.style.setProperty('top', (overlayStartTop + deltaY) + 'px', 'important');
+      overlay.style.setProperty('transform', 'none', 'important');
     });
 
     document.addEventListener('mouseup', () => {
