@@ -108,6 +108,8 @@ def filter_introductory_sentences(text: str) -> str:
     ]
 
     for line in lines:
+        # Remove leading > signs (Markdown blockquote syntax)
+        line = line.lstrip('>')
         line_lower = line.lower().strip()
         # Skip if line is empty or is just planning text
         if not line_lower:
