@@ -280,11 +280,6 @@ async function loadUserProfile() {
 }
 
 function displayProfile(profile) {
-  // Email and member since
-  document.getElementById('username').textContent = profile.google_email;
-  const memberDate = new Date(profile.created_at).toLocaleDateString();
-  document.getElementById('memberSince').textContent = memberDate;
-
   // Monthly quota
   const monthlyPercent = (profile.quotas.monthly_used / profile.quotas.monthly_limit) * 100;
   document.getElementById('monthlyUsed').textContent = profile.quotas.monthly_used;
