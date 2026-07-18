@@ -791,15 +791,15 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: rgba(255, 255, 255, 0.9) !important;
-      border: 1px solid #E5E7EB !important;
+      background: transparent !important;
+      border: none !important;
       border-radius: 12px !important;
       padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 14px !important;
       color: #374151 !important;
       z-index: 999999 !important;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.1) !important;
+      box-shadow: none !important;
       width: 300px !important;
       height: 300px !important;
       display: flex !important;
