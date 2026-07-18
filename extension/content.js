@@ -738,22 +738,31 @@
     });
 
     // Make overlay draggable from header
-    const header = overlay.querySelector('.fc-header');
+    makeOverlayDraggable(overlay, overlay.querySelector('.fc-header'));
+
+    document.body.appendChild(overlay);
+  }
+
+  // Makes `overlay` draggable by mousedown-dragging `handle` (defaults to the overlay itself).
+  // Converts the overlay's initial centering (top/left % + transform) into fixed px on first drag,
+  // so the user can move it aside and keep working on the page underneath.
+  function makeOverlayDraggable(overlay, handle) {
+    handle = handle || overlay;
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
     let overlayStartLeft = 0;
     let overlayStartTop = 0;
 
-    header.style.cursor = 'grab !important';
-    header.addEventListener('mousedown', (e) => {
+    handle.style.cursor = 'grab !important';
+    handle.addEventListener('mousedown', (e) => {
       isDragging = true;
       dragStartX = e.clientX;
       dragStartY = e.clientY;
       const rect = overlay.getBoundingClientRect();
       overlayStartLeft = rect.left;
       overlayStartTop = rect.top;
-      header.style.cursor = 'grabbing !important';
+      handle.style.cursor = 'grabbing !important';
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -769,10 +778,8 @@
 
     document.addEventListener('mouseup', () => {
       isDragging = false;
-      header.style.cursor = 'grab !important';
+      handle.style.cursor = 'grab !important';
     });
-
-    document.body.appendChild(overlay);
   }
 
   function showLoadingAnimation() {
@@ -833,6 +840,10 @@
         </svg>
       </div>
     `;
+
+    // Entire widget acts as the drag handle (no header, just the animation) so users
+    // can move it aside and keep working on the page while the analysis runs.
+    makeOverlayDraggable(overlay);
 
     document.body.appendChild(overlay);
     return overlay;
