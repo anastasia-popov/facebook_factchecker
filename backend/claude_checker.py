@@ -295,11 +295,13 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                 logger.debug(f"Reached max iterations ({max_iterations}), exiting loop")
                 break
 
-        # Extract final text response - search backwards through messages for latest assistant text
+        # Extract final text response - search for best quality response
         logger.debug(f"Messages length: {len(messages)}")
 
         final_response = ""
-        # Search from the end of messages backwards to find the last text response
+        responses_to_try = []
+
+        # Collect all assistant text responses (backwards)
         for i in range(len(messages) - 1, -1, -1):
             msg = messages[i]
             logger.debug(f"Checking message {i}, role: {msg.get('role')}")
@@ -308,20 +310,33 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                 for content_block in content:
                     logger.debug(f"Content block type: {content_block.get('type')}")
                     if content_block.get("type") == "text":
-                        final_response = content_block.get("text", "")
-                        logger.debug(f"Found text block: {final_response[:100]}...")
-                        break
-                if final_response:
-                    break
+                        text = content_block.get("text", "")
+                        if text:
+                            responses_to_try.append(text)
+                            logger.debug(f"Found text block: {text[:100]}...")
 
-        if not final_response:
+        if not responses_to_try:
             logger.error("No text response found in Claude messages")
             for i, msg in enumerate(messages):
                 logger.error(f"Message {i}: {msg}")
             raise Exception("Claude did not return text analysis")
 
-        # Filter out introductory/planning sentences from the final response
-        final_response = filter_introductory_sentences(final_response)
+        # Filter responses and use the first one that has substantial content
+        for response in responses_to_try:
+            filtered = filter_introductory_sentences(response)
+            if filtered and len(filtered.strip()) > 100:  # Require meaningful content
+                final_response = filtered
+                logger.debug(f"Selected response with {len(final_response)} chars after filtering")
+                break
+
+        # If no filtered response was substantial, use the longest unfiltered one
+        if not final_response:
+            final_response = max(responses_to_try, key=len) if responses_to_try else ""
+            logger.warning(f"No substantial filtered response found, using longest response ({len(final_response)} chars)")
+
+        if not final_response or len(final_response.strip()) == 0:
+            logger.error(f"Final response is empty after processing {len(responses_to_try)} responses")
+            raise Exception("Claude returned only introductory text, no actual analysis")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         return final_response
