@@ -28,8 +28,35 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Fact Checker Backend")
 
 # Temporary storage for OAuth tokens (keyed by state)
-# In production, use Redis or a database
+# In production, use Redis or a database.
+# Each entry is {state: {"tokens": {...}, "created_at": datetime}}.
 oauth_tokens_cache = {}
+
+# Server-issued OAuth states for CSRF protection (state -> issued datetime).
+# The callback rejects any state we did not issue.
+oauth_pending_states = {}
+
+# How long an OAuth state / cached token bundle stays valid.
+OAUTH_STATE_TTL_SECONDS = 600  # 10 minutes
+
+# OCR upload limits (defend against DoS / decompression bombs)
+OCR_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+OCR_ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
+# Cap total decoded pixels so a small file can't expand into gigabytes of memory
+Image.MAX_IMAGE_PIXELS = 40_000_000  # ~40 MP
+
+
+def _purge_expired_oauth(now: datetime = None):
+    """Drop expired pending states and cached token bundles."""
+    now = now or datetime.utcnow()
+    ttl = timedelta(seconds=OAUTH_STATE_TTL_SECONDS)
+    for state in [s for s, t in oauth_pending_states.items() if now - t > ttl]:
+        oauth_pending_states.pop(state, None)
+    for state in [
+        s for s, v in oauth_tokens_cache.items()
+        if now - v.get("created_at", now) > ttl
+    ]:
+        oauth_tokens_cache.pop(state, None)
 
 # Initialize database
 init_db()
@@ -63,16 +90,19 @@ def get_current_user(
     return user
 
 
+# Starlette matches allow_origins as exact strings — wildcard patterns like
+# "chrome-extension://*" silently never match. Use allow_origin_regex so the
+# extension origins and Facebook (sub)domains are actually permitted.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "chrome-extension://*",
-        "http://localhost:*",
-        "https://localhost:*",
-        "https://www.facebook.com",
-        "https://*.facebook.com",
-        "https://facebook.com"
-    ],
+    allow_origin_regex=(
+        r"^("
+        r"chrome-extension://[a-z]+"
+        r"|moz-extension://[0-9a-f-]+"
+        r"|https?://localhost(:\d+)?"
+        r"|https://([a-z0-9-]+\.)*facebook\.com"
+        r")$"
+    ),
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
     allow_credentials=True,
@@ -89,6 +119,10 @@ async def start_google_oauth():
     try:
         # Generate state for CSRF protection
         state = google_oauth_manager.generate_state()
+
+        # Record the state server-side so the callback can verify we issued it
+        _purge_expired_oauth()
+        oauth_pending_states[state] = datetime.utcnow()
 
         # Get authorization URL
         oauth_url = google_oauth_manager.get_authorization_url(state)
@@ -114,6 +148,12 @@ async def google_oauth_callback(
     """Handle Google OAuth callback (GET request from Google)"""
     logger.info(f"Google OAuth callback received with state: {state}")
     try:
+        # CSRF protection: reject any state we did not issue (or that has expired)
+        _purge_expired_oauth()
+        if oauth_pending_states.pop(state, None) is None:
+            logger.warning(f"Rejected OAuth callback with unknown/expired state: {state}")
+            raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
         # Exchange authorization code for Google token
         logger.info(f"Exchanging code for token...")
         google_token_data = await google_oauth_manager.exchange_code_for_token(code)
@@ -140,14 +180,17 @@ async def google_oauth_callback(
 
         logger.info(f"User authenticated via Google: {user_info['email']}")
 
-        # Store tokens in cache for popup to retrieve
+        # Store tokens in cache for popup to retrieve (short-lived, single-use)
         logger.info(f"Storing tokens in cache with state: {state}")
         oauth_tokens_cache[state] = {
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'token_type': 'bearer',
-            'expires_in': 3600,
-            'refresh_token_expires_in': 31536000
+            'tokens': {
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'token_type': 'bearer',
+                'expires_in': 3600,
+                'refresh_token_expires_in': 31536000
+            },
+            'created_at': datetime.utcnow()
         }
         logger.info(f"Tokens stored. Cache keys: {list(oauth_tokens_cache.keys())}")
 
@@ -208,17 +251,19 @@ async def google_oauth_callback(
 
 @app.get("/auth/google/get-tokens")
 async def get_oauth_tokens(state: str):
-    """Retrieve tokens that were stored during OAuth callback"""
+    """Retrieve tokens that were stored during OAuth callback (single-use, short-lived)"""
     logger.info(f"get_oauth_tokens called with state: {state}")
-    logger.info(f"Cache contents: {list(oauth_tokens_cache.keys())}")
 
-    if state not in oauth_tokens_cache:
-        logger.warning(f"State {state} not found in cache")
+    # Drop any expired entries first so stale token bundles can't be retrieved
+    _purge_expired_oauth()
+
+    entry = oauth_tokens_cache.pop(state, None)  # Remove from cache after retrieval
+    if entry is None:
+        logger.warning(f"State {state} not found or expired in cache")
         raise HTTPException(status_code=404, detail="Tokens not found. Please try logging in again.")
 
     logger.info(f"Found tokens for state {state}, returning")
-    tokens = oauth_tokens_cache.pop(state)  # Remove from cache after retrieval
-    return TokenResponse(**tokens)
+    return TokenResponse(**entry['tokens'])
 
 
 @app.post("/auth/refresh", response_model=TokenResponse)
@@ -424,20 +469,52 @@ async def extract_text_from_image(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Extract text from image using OCR (protected, not rate-limited)"""
+    """Extract text from image using OCR (protected, rate-limited)"""
+    # Rate limit OCR the same way as other protected endpoints
+    allowed, quota_info = rate_limiter.check_and_record_usage(
+        user, "/ocr", tokens_required=1, db=db
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
+        )
+
+    # Validate declared content type before reading the body
+    if file.content_type not in OCR_ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type: {file.content_type}. Allowed: {sorted(OCR_ALLOWED_CONTENT_TYPES)}"
+        )
+
+    # Read the uploaded image with a hard size cap to prevent memory-exhaustion DoS
+    contents = await file.read(OCR_MAX_UPLOAD_BYTES + 1)
+    if len(contents) > OCR_MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image too large. Maximum size is {OCR_MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+        )
+
     try:
         logger.debug(f"[{user.google_email}] Extracting text from image: {file.filename}")
 
-        # Read the uploaded image
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
+        # Open and verify the image is a real, decodable image within pixel limits
+        try:
+            image = Image.open(io.BytesIO(contents))
+            image.verify()  # detects truncated/malformed images & decompression bombs
+            # verify() leaves the image unusable; reopen for actual processing
+            image = Image.open(io.BytesIO(contents))
+        except Image.DecompressionBombError:
+            raise HTTPException(status_code=413, detail="Image exceeds maximum allowed dimensions.")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid or corrupted image file.")
 
         # Extract text using Tesseract
         extracted_text = pytesseract.image_to_string(image)
 
         if not extracted_text or len(extracted_text.strip()) == 0:
             logger.warning(f"[{user.google_email}] OCR returned empty text")
-            raise Exception("No text found in the image")
+            raise HTTPException(status_code=422, detail="No text found in the image")
 
         logger.debug(f"[{user.google_email}] OCR complete, extracted {len(extracted_text)} characters")
 
@@ -445,6 +522,8 @@ async def extract_text_from_image(
             "text": extracted_text,
             "length": len(extracted_text)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in OCR: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=str(e))
@@ -453,8 +532,8 @@ async def extract_text_from_image(
 # ==================== Settings Endpoints ====================
 
 @app.get("/settings/model")
-async def get_model_setting():
-    """Get current Claude model setting"""
+async def get_model_setting(user: User = Depends(get_current_user)):
+    """Get current Claude model setting (protected)"""
     from claude_checker import CURRENT_MODEL, AVAILABLE_MODELS
     return {
         "current_model": CURRENT_MODEL,
@@ -463,8 +542,11 @@ async def get_model_setting():
 
 
 @app.post("/settings/model")
-async def set_model_setting(request_body: dict):
-    """Set Claude model setting"""
+async def set_model_setting(
+    request_body: dict,
+    user: User = Depends(get_current_user)
+):
+    """Set Claude model setting (protected)"""
     from claude_checker import AVAILABLE_MODELS
     import claude_checker
 
