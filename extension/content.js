@@ -633,7 +633,7 @@
     const originalTextHtml = originalText ? `
       <div style="background: #F0F9FB !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #0891B2 !important; border-radius: 6px !important;">
         <div style="font-weight: 700 !important; font-size: 12px !important; color: #0891B2 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;">📝 Original Text:</div>
-        <div style="font-weight: 700 !important; font-size: 17.5px !important; color: #4B5563 !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
+        <div style="font-weight: 700 !important; font-size: 15px !important; color: #4B5563 !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-style: italic !important; letter-spacing: 0.3px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
           ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
         </div>
       </div>
