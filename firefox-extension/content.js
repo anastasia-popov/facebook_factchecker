@@ -605,11 +605,11 @@
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay';
     overlay.setAttribute('data-fc-overlay', 'true');
+    const centerLeft = (window.innerWidth - 700) / 2;
     overlay.style.cssText = `
       position: fixed !important;
       top: 20px !important;
-      left: 50% !important;
-      transform: translateX(-50%) !important;
+      left: ${Math.max(10, Math.min(centerLeft, window.innerWidth - 710))}px !important;
       background: #FFFFFF !important;
       border: 1px solid #E5E7EB !important;
       border-radius: 12px !important;
@@ -658,6 +658,41 @@
     });
     closeBtn.addEventListener('mouseout', () => {
       closeBtn.style.color = '#9CA3AF !important';
+    });
+
+    // Make overlay draggable from header
+    const header = overlay.querySelector('.fc-header');
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let overlayStartLeft = 0;
+    let overlayStartTop = 0;
+
+    header.style.cursor = 'grab !important';
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      const rect = overlay.getBoundingClientRect();
+      overlayStartLeft = rect.left;
+      overlayStartTop = rect.top;
+      header.style.cursor = 'grabbing !important';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - dragStartX;
+      const deltaY = e.clientY - dragStartY;
+
+      overlay.style.left = (overlayStartLeft + deltaX) + 'px !important';
+      overlay.style.top = (overlayStartTop + deltaY) + 'px !important';
+      overlay.style.transform = 'none !important';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      header.style.cursor = 'grab !important';
     });
 
     document.body.appendChild(overlay);
