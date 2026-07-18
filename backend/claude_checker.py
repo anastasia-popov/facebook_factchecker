@@ -87,37 +87,55 @@ async def fetch_and_summarize_url(url: str) -> str:
 
 
 def filter_introductory_sentences(text: str) -> str:
-    """Remove introductory/planning sentences from response."""
+    """Remove planning/intent statements from response, but keep introductions and analysis."""
     lines = text.split('\n')
     filtered_lines = []
 
-    introductory_patterns = [
-        'will research',
+    # Only filter out pure planning/intent statements, not introductions
+    planning_patterns = [
         'will search',
-        'let me search',
+        'will research',
+        'will check',
+        'will examine',
         "i'll search",
+        "i'll research",
+        "i'll check",
+        "i'll examine",
         "i'll analyze",
-        'let me fact',
+        'let me search',
+        'let me research',
+        'let me check',
+        'let me examine',
         'let me analyze',
-        'proceed with',
-        'going through',
-        'checking each',
-        'examining each',
+        'let me fact',
         'searching for',
+        'checking for',
         'looking for',
+        'examining the',
     ]
 
     for line in lines:
         # Remove leading > signs (Markdown blockquote syntax)
         line = line.lstrip('>')
         line_lower = line.lower().strip()
-        # Skip if line is empty or is just planning text
+
+        # Skip if line is empty
         if not line_lower:
             filtered_lines.append(line)
-        elif any(pattern in line_lower for pattern in introductory_patterns) and len(line) < 200:
-            # Skip introductory/planning sentences that are short
-            logger.debug(f"Filtering out planning line: {line[:80]}...")
-            continue
+        # Only skip if line contains ONLY planning language with no actual content
+        elif any(pattern in line_lower for pattern in planning_patterns):
+            # Check if line is mostly just the planning statement
+            # If it contains analysis content (verdict, sources, etc.), keep it
+            if any(keyword in line_lower for keyword in ['verdict', 'true', 'false', 'misleading', 'unverified', 'sources', 'url', 'http', '**claim']):
+                # Line has planning text but also analysis - keep it
+                filtered_lines.append(line)
+            elif len(line) < 150:
+                # Short line with just planning language - skip it
+                logger.debug(f"Filtering out planning line: {line[:80]}...")
+                continue
+            else:
+                # Long line might have content mixed in - keep it
+                filtered_lines.append(line)
         else:
             filtered_lines.append(line)
 
@@ -248,46 +266,48 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
 
                 # Determine if we should continue or stop
                 text_lower = text_content.lower()
-                is_introductory = has_text and (
-                    "will research" in text_lower or
-                    "will search" in text_lower or
-                    "let me search" in text_lower or
-                    "i'll search" in text_lower or
-                    "i'll analyze" in text_lower or
-                    "let me fact" in text_lower or
-                    "let me analyze" in text_lower or
-                    "proceed with" in text_lower or
-                    "going through" in text_lower or
-                    "checking each" in text_lower or
-                    "examining each" in text_lower or
-                    ("simultaneously" in text_lower and len(text_content) < 300) or
-                    ("each" in text_lower and "claim" in text_lower and len(text_content) < 300) or
-                    len(text_content) < 150  # Very short response likely intro
+
+                # Check if response is pure planning with no analysis content
+                is_pure_planning = has_text and (
+                    len(text_content) < 150 and (
+                        "will search" in text_lower or
+                        "will research" in text_lower or
+                        "i'll search" in text_lower or
+                        "let me search" in text_lower or
+                        "checking" in text_lower or
+                        "examining" in text_lower
+                    )
                 )
+
+                # Check if response has actual analysis content
+                has_analysis = has_text and any(keyword in text_lower for keyword in [
+                    'verdict', 'true', 'false', 'misleading', 'unverified',
+                    '**claim', 'sources:', 'evidence:', 'analysis'
+                ])
 
                 # Always execute tools if requested (tool_use requires immediate tool_result)
                 if has_tool_use and tool_results:
                     logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
                     messages.append({"role": "user", "content": tool_results})
-                    # Continue the loop to get Claude's next response (will check if it's introductory)
-                # If no tools, check if text is complete analysis or just planning
-                elif has_text and not is_introductory:
-                    # Claude provided substantial text without requesting tools
-                    logger.debug(f"Claude provided final analysis ({len(text_content)} chars), stopping iteration")
+                    # Continue the loop to get Claude's next response
+                # If no tools, check if text is pure planning or has actual analysis
+                elif has_text and (has_analysis or not is_pure_planning):
+                    # Claude provided actual analysis or substantial text (not just planning)
+                    logger.debug(f"Claude provided analysis ({len(text_content)} chars), stopping iteration")
                     break
-                elif has_text and is_introductory:
-                    # Claude provided planning/intro text, ask for actual analysis
-                    logger.debug("Claude provided planning text, requesting full analysis")
+                elif has_text and is_pure_planning:
+                    # Claude provided only planning text, ask for actual analysis
+                    logger.debug("Claude provided planning text without analysis, requesting fact-check results")
                     messages.append({
                         "role": "user",
-                        "content": "Please provide the actual fact-checking analysis now. Do not explain what you will do - start with the verdict for each claim."
+                        "content": "Please provide your fact-checking analysis now. Include the verdict, sources, and evidence for each claim."
                     })
                 else:
                     # Claude finished without providing text or tools - ask for analysis
                     logger.debug("Claude finished without text or tools, requesting final analysis")
                     messages.append({
                         "role": "user",
-                        "content": "Based on all the information gathered, please provide your complete fact-checking analysis now."
+                        "content": "Based on the information gathered, please provide your complete fact-checking analysis now."
                     })
 
             # If we're at the last iteration, break
