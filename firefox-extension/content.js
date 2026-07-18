@@ -539,6 +539,80 @@
     });
   }
 
+  // Visual identity per nesting depth: bullet glyph, color and ordered-list numbering style.
+  // Depth cycles back to index 0 style after LIST_DEPTH_STYLES.length levels.
+  const LIST_DEPTH_STYLES = [
+    { bullet: '•', color: '#0891B2', olType: 'decimal' },
+    { bullet: '◦', color: '#0E7490', olType: 'lower-alpha' },
+    { bullet: '▪', color: '#155E75', olType: 'lower-roman' },
+    { bullet: '‣', color: '#164E63', olType: 'decimal' },
+  ];
+
+  function parseNestedLists(text) {
+    const lines = text.split('\n');
+    const out = [];
+    const stack = []; // {depth, type: 'ul'|'ol'}
+    const listItemRegex = /^(\s*)([-*+]|\d+[.)])\s+(.+)$/;
+
+    function openList(type, depth) {
+      const style = LIST_DEPTH_STYLES[depth % LIST_DEPTH_STYLES.length];
+      const indent = 20 + depth * 20;
+      if (type === 'ul') {
+        out.push(`<ul style="list-style: none !important; margin: 4px 0 !important; padding-left: ${indent}px !important;">`);
+      } else {
+        out.push(`<ol style="margin: 4px 0 !important; padding-left: ${indent + 4}px !important; list-style-type: ${style.olType} !important; color: ${style.color} !important;">`);
+      }
+      stack.push({ depth, type });
+    }
+
+    function closeList() {
+      const top = stack.pop();
+      out.push(top.type === 'ul' ? '</ul>' : '</ol>');
+    }
+
+    function closeAll() {
+      while (stack.length) closeList();
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/\t/g, '    ');
+      const match = line.match(listItemRegex);
+
+      if (!match) {
+        if (stack.length) closeAll();
+        out.push(rawLine + '\n');
+        continue;
+      }
+
+      const [, indentStr, marker, content] = match;
+      const depth = Math.min(Math.floor(indentStr.length / 2), LIST_DEPTH_STYLES.length - 1);
+      const type = /\d/.test(marker) ? 'ol' : 'ul';
+
+      // Close any lists deeper than the current item
+      while (stack.length && stack[stack.length - 1].depth > depth) {
+        closeList();
+      }
+      // Same depth but switching between ordered/unordered - close and reopen
+      if (stack.length && stack[stack.length - 1].depth === depth && stack[stack.length - 1].type !== type) {
+        closeList();
+      }
+      // Open a new list level if none is open at this depth
+      if (!stack.length || stack[stack.length - 1].depth < depth) {
+        openList(type, depth);
+      }
+
+      if (type === 'ul') {
+        const style = LIST_DEPTH_STYLES[depth % LIST_DEPTH_STYLES.length];
+        out.push(`<li style="margin: 3px 0 !important; line-height: 1.5 !important;"><span style="color: ${style.color} !important; margin-right: 8px !important; font-weight: 700 !important;">${style.bullet}</span>${content}</li>`);
+      } else {
+        out.push(`<li style="margin: 3px 0 !important; line-height: 1.5 !important;">${content}</li>`);
+      }
+    }
+
+    closeAll();
+    return out.join('');
+  }
+
   function markdownToHtml(text) {
     let html = parseTextWithLinks(text);
 
@@ -580,6 +654,8 @@
       tableHtml += '</table>';
       return prefix + tableHtml;
     });
+
+    html = parseNestedLists(html);
 
     html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #0891B2 !important;">$1</h3>');
     html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h2>');
