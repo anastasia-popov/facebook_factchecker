@@ -557,11 +557,13 @@
 
     function openList(type, depth) {
       const style = LIST_DEPTH_STYLES[depth % LIST_DEPTH_STYLES.length];
-      const indent = 20 + depth * 20;
+      // First level has no left indent; each nested level indents by half the
+      // previous per-level amount (was 20px/level, now 10px/level).
+      const indent = depth * 10;
       if (type === 'ul') {
         out.push(`<ul style="list-style: none !important; margin: 4px 0 !important; padding-left: ${indent}px !important;">`);
       } else {
-        out.push(`<ol style="margin: 4px 0 !important; padding-left: ${indent + 4}px !important; list-style-type: ${style.olType} !important; color: ${style.color} !important;">`);
+        out.push(`<ol style="margin: 4px 0 !important; padding-left: ${indent}px !important; list-style-type: ${style.olType} !important; color: ${style.color} !important;">`);
       }
       stack.push({ depth, type });
     }
