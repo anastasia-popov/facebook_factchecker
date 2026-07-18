@@ -1,5 +1,7 @@
 import logging
 import io
+import html
+import json
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Request
 from fastapi.responses import HTMLResponse
@@ -149,7 +151,9 @@ async def google_oauth_callback(
         }
         logger.info(f"Tokens stored. Cache keys: {list(oauth_tokens_cache.keys())}")
 
-        # Return HTML page that closes the window
+        # Return HTML page that closes the window.
+        # state is JSON-encoded to safely embed it in the JS context (prevents XSS).
+        safe_state_js = json.dumps(state)
         html_content = f"""
         <html>
         <head><title>Authentication Successful</title></head>
@@ -159,7 +163,7 @@ async def google_oauth_callback(
                 if (window.opener) {{
                     window.opener.postMessage({{
                         action: 'oauthCallback',
-                        state: '{state}'
+                        state: {safe_state_js}
                     }}, '*');
                 }}
 
@@ -175,22 +179,27 @@ async def google_oauth_callback(
         return HTMLResponse(content=html_content)
     except Exception as e:
         logger.error(f"Error in google_oauth_callback: {e}", exc_info=True)
+        # Encode error safely for both JS (json.dumps) and HTML (html.escape) contexts.
+        safe_error_js = json.dumps(str(e))
+        safe_error_html = html.escape(str(e))
         html_content = f"""
         <html>
         <head><title>Authentication Failed</title></head>
         <body>
             <script>
                 // Send error to popup
-                window.opener.postMessage({{
-                    action: 'oauthCallback',
-                    success: false,
-                    error: '{str(e)}'
-                }}, '*');
+                if (window.opener) {{
+                    window.opener.postMessage({{
+                        action: 'oauthCallback',
+                        success: false,
+                        error: {safe_error_js}
+                    }}, '*');
+                }}
 
                 // Close this window
                 window.close();
             </script>
-            <p>Authentication failed: {str(e)}</p>
+            <p>Authentication failed: {safe_error_html}</p>
         </body>
         </html>
         """

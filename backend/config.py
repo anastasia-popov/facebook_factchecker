@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,20 @@ class Settings(BaseSettings):
 
     # Backend URL (for OAuth redirects)
     backend_url: str = "http://localhost:8000"
+
+    @field_validator('jwt_secret_key')
+    @classmethod
+    def jwt_secret_must_be_strong(cls, v):
+        """Fail startup if JWT secret is missing or weak.
+
+        An empty/short secret would allow anyone to forge valid tokens for any user.
+        """
+        if not v or len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set and at least 32 characters long. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+        return v
 
     class Config:
         env_file = ".env"

@@ -8,5 +8,6 @@ firefox-extension/config.json
 backend/__pycache__/
 backend/.venv/
 *.db
+*.db.backup
 .claude/worktrees/
 backend/.env.bak
