@@ -71,21 +71,6 @@ async def search_web(query: str) -> list[dict]:
         return []
 
 
-async def fetch_and_summarize_url(url: str) -> str:
-    """Fetch a web page and return its content (first 2000 chars)."""
-    try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            # Simple text extraction - take first 2000 chars of response text
-            content = response.text[:2000]
-            logger.debug(f"Fetched content from {url}, length: {len(content)}")
-            return content
-    except Exception as e:
-        logger.error(f"Error fetching {url}: {e}")
-        return ""
-
-
 def filter_introductory_sentences(text: str) -> str:
     """Remove planning/intent statements from response, but keep introductions and analysis."""
     lines = text.split('\n')

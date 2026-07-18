@@ -119,19 +119,6 @@ class JWTManager:
         except JWTError:
             return None
 
-    def decode_token_without_verification(self, token: str) -> Optional[Dict]:
-        """Decode token without verification (for debugging)"""
-        try:
-            payload = jwt.decode(
-                token,
-                self.secret_key,
-                algorithms=[self.algorithm],
-                options={"verify_signature": False}
-            )
-            return payload
-        except JWTError:
-            return None
-
 
 class UserManager:
     """Manage user creation and updates"""

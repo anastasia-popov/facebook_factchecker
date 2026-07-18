@@ -273,10 +273,8 @@ async def refresh_access_token(
 ):
     """Refresh access token using refresh token"""
     try:
-        # Find user by refresh token
-        from database import SessionLocal
-        db_session = SessionLocal()
-        user = db_session.query(User).filter(
+        # Find user by refresh token (use the request-scoped session managed by FastAPI)
+        user = db.query(User).filter(
             User.jwt_refresh_token == req.refresh_token
         ).first()
 
@@ -292,8 +290,7 @@ async def refresh_access_token(
         access_token = jwt_manager.create_access_token(user.id, user.google_email)
 
         # Update user's refresh token
-        UserManager.refresh_user_token(user, new_refresh_token, db_session)
-        db_session.close()
+        UserManager.refresh_user_token(user, new_refresh_token, db)
 
         logger.info(f"Token refreshed for user: {user.google_email}")
 
@@ -469,15 +466,15 @@ async def extract_text_from_image(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Extract text from image using OCR (protected, rate-limited)"""
-    # Rate limit OCR the same way as other protected endpoints
-    allowed, quota_info = rate_limiter.check_and_record_usage(
-        user, "/ocr", tokens_required=1, db=db
+    """Extract text from image using OCR (protected, rate-limited on separate OCR quota)"""
+    # Rate limit OCR against its own monthly quota (independent of fact-check quota)
+    allowed, quota_info = rate_limiter.check_and_record_ocr_usage(
+        user, tokens_required=1, db=db
     )
     if not allowed:
         raise HTTPException(
             status_code=429,
-            detail=f"Rate limit exceeded. Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
+            detail=f"OCR rate limit exceeded. Monthly: {quota_info['monthly_used']}/{quota_info['monthly_limit']}"
         )
 
     # Validate declared content type before reading the body

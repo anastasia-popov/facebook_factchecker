@@ -9,8 +9,62 @@ logger = logging.getLogger(__name__)
 class RateLimiter:
     """Rate limiter for user API requests (monthly quota only)"""
 
-    def __init__(self, monthly_quota: int = 5000):
+    def __init__(self, monthly_quota: int = 5000, ocr_monthly_quota: int = 500):
         self.monthly_quota = monthly_quota
+        self.ocr_monthly_quota = ocr_monthly_quota
+
+    def check_and_record_ocr_usage(
+        self,
+        user: User,
+        tokens_required: int = 1,
+        db: Session = None
+    ) -> tuple[bool, dict]:
+        """Check/record OCR usage against a separate monthly OCR quota.
+
+        OCR is tracked independently of the fact-check quota by counting
+        UsageTracking rows for the '/ocr' endpoint in the current calendar month,
+        so it never touches the shared RateLimitBucket counter.
+        """
+        if not db:
+            return False, {"error": "Database session required"}
+
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        ocr_used = db.query(UsageTracking).filter(
+            UsageTracking.user_id == user.id,
+            UsageTracking.endpoint == '/ocr',
+            UsageTracking.request_timestamp >= month_start
+        ).count()
+
+        allowed = (ocr_used + tokens_required) <= self.ocr_monthly_quota
+
+        quota_info = {
+            'monthly_limit': self.ocr_monthly_quota,
+            'monthly_used': ocr_used,
+            'monthly_remaining': max(0, self.ocr_monthly_quota - ocr_used),
+            'allowed': allowed,
+        }
+
+        if allowed:
+            usage = UsageTracking(
+                user_id=user.id,
+                endpoint='/ocr',
+                tokens_used=tokens_required
+            )
+            db.add(usage)
+            db.commit()
+            logger.info(
+                f"User {user.google_email} made OCR request "
+                f"(monthly OCR: {ocr_used + tokens_required}/{self.ocr_monthly_quota})"
+            )
+        else:
+            logger.warning(
+                f"User {user.google_email} exceeded OCR rate limit "
+                f"(monthly OCR: {ocr_used}/{self.ocr_monthly_quota})"
+            )
+
+        return allowed, quota_info
 
     def check_and_record_usage(
         self,
@@ -134,4 +188,4 @@ class RateLimiter:
 
 
 # Initialize rate limiter
-rate_limiter = RateLimiter(monthly_quota=5000)
+rate_limiter = RateLimiter(monthly_quota=5000, ocr_monthly_quota=500)
