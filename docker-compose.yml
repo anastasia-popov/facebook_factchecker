@@ -21,8 +21,7 @@ services:
     ports:
       - "3003:3003"
     volumes:
-      - ./backend/certificate.crt:/app/certificate.crt:ro
-      - ./backend/private.key:/app/private.key:ro
+      - /usr/syno/etc/certificate/_archive/BE9Pmt:/app/certs:ro
       - ./backend/logs:/app/logs
     depends_on:
       db:
