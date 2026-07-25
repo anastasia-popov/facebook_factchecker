@@ -170,10 +170,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true;
   } else if (request.action === 'openPopup') {
-    // Open the extension popup
-    chrome.action.openPopup(() => {
-      sendResponse({ success: true });
-    });
+    // Open the extension popup. Firefox's action.openPopup() returns a
+    // Promise and rejects the call outright if given a callback argument
+    // (unlike Chrome's callback-style version).
+    chrome.action.openPopup()
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error?.message || String(error) }));
     return true;
   }
 });
