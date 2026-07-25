@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean, Text, Date
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean, Text, Date, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
@@ -30,9 +30,6 @@ class User(Base):
     # Display name (from Google)
     display_name = Column(String(255), nullable=True)
 
-    jwt_refresh_token = Column(String(500), unique=True, nullable=False, index=True)
-    jwt_refresh_token_expiry = Column(DateTime, nullable=False)
-
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_login = Column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -44,6 +41,21 @@ class User(Base):
 
     def __repr__(self):
         return f"<User({self.google_email})>"
+
+
+class RefreshToken(Base):
+    """One row per logged-in browser/device, so signing in on a second
+    browser doesn't invalidate the first one's session."""
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token = Column(String(500), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<RefreshToken(user_id={self.user_id})>"
 
 
 class UsageTracking(Base):

@@ -165,15 +165,18 @@ async def google_oauth_callback(
         logger.info(f"Got user info: {user_info['email']}")
 
         # Create or update user
-        refresh_token = jwt_manager.create_refresh_token()
         user = UserManager.create_or_update_user(
             google_id=user_info['id'],
             google_email=user_info['email'],
             display_name=user_info.get('name', user_info['email']),
             google_access_token=google_token_data['access_token'],
-            jwt_refresh_token=refresh_token,
             db=db
         )
+
+        # Create a new session for this browser/device - a separate row per
+        # login means signing in elsewhere never invalidates this session.
+        refresh_token = jwt_manager.create_refresh_token()
+        UserManager.create_session(user.id, refresh_token, db)
 
         # Create access token
         access_token = jwt_manager.create_access_token(user.id, user_info['email'])
@@ -273,24 +276,25 @@ async def refresh_access_token(
 ):
     """Refresh access token using refresh token"""
     try:
-        # Find user by refresh token (use the request-scoped session managed by FastAPI)
-        user = db.query(User).filter(
-            User.jwt_refresh_token == req.refresh_token
-        ).first()
+        # Find this browser/device's session by its refresh token
+        session = UserManager.get_session_by_token(req.refresh_token, db)
 
-        if not user:
+        if not session:
             raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-        # Validate refresh token expiration
-        if user.jwt_refresh_token_expiry < datetime.utcnow():
+        if session.expires_at < datetime.utcnow():
             raise HTTPException(status_code=401, detail="Refresh token expired")
+
+        user = UserManager.get_user_by_id(session.user_id, db)
+        if not user or not user.active:
+            raise HTTPException(status_code=401, detail="User not found or inactive")
 
         # Create new tokens
         new_refresh_token = jwt_manager.create_refresh_token()
         access_token = jwt_manager.create_access_token(user.id, user.google_email)
 
-        # Update user's refresh token
-        UserManager.refresh_user_token(user, new_refresh_token, db)
+        # Rotate this session's refresh token in place
+        UserManager.rotate_session(session, new_refresh_token, db)
 
         logger.info(f"Token refreshed for user: {user.google_email}")
 
@@ -361,12 +365,16 @@ async def get_user_profile(
 
 @app.post("/auth/logout")
 async def logout(
+    req: RefreshTokenRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Logout user by invalidating refresh token"""
+    """Log out of this one browser/device by revoking its session.
+
+    Other devices/browsers logged in as the same user are unaffected.
+    """
     try:
-        UserManager.logout_user(user, db)
+        UserManager.revoke_session(req.refresh_token, db)
         logger.info(f"User logged out: {user.google_email}")
         return {"message": "Logged out successfully"}
     except Exception as e:

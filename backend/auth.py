@@ -8,7 +8,7 @@ import httpx
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from config import settings
-from database import User, SessionLocal
+from database import User, RefreshToken, SessionLocal
 import logging
 
 logger = logging.getLogger(__name__)
@@ -139,34 +139,28 @@ class UserManager:
         google_email: str,
         display_name: str,
         google_access_token: str,
-        jwt_refresh_token: str,
         db: SessionLocal
     ) -> User:
-        """Create or update user from Google OAuth response"""
+        """Create or update user profile from Google OAuth response.
+
+        Does not touch sessions - each login gets its own RefreshToken row
+        via create_session(), so logging in from another browser/device
+        doesn't invalidate this one.
+        """
         user = db.query(User).filter(User.google_id == google_id).first()
 
-        refresh_token_expiry = datetime.utcnow() + timedelta(
-            days=settings.refresh_token_expiration_days
-        )
-
         if user:
-            # Update existing user
             user.google_access_token = google_access_token
             user.google_email = google_email
             user.display_name = display_name
-            user.jwt_refresh_token = jwt_refresh_token
-            user.jwt_refresh_token_expiry = refresh_token_expiry
             user.last_login = datetime.utcnow()
             user.active = True
         else:
-            # Create new user
             user = User(
                 google_id=google_id,
                 google_email=google_email,
                 display_name=display_name,
                 google_access_token=google_access_token,
-                jwt_refresh_token=jwt_refresh_token,
-                jwt_refresh_token_expiry=refresh_token_expiry,
                 last_login=datetime.utcnow(),
                 active=True
             )
@@ -177,32 +171,36 @@ class UserManager:
         return user
 
     @staticmethod
-    def validate_refresh_token(user: User, refresh_token: str) -> bool:
-        """Validate refresh token for a user"""
-        if user.jwt_refresh_token != refresh_token:
-            return False
-
-        if user.jwt_refresh_token_expiry < datetime.utcnow():
-            return False
-
-        return True
-
-    @staticmethod
-    def refresh_user_token(user: User, new_refresh_token: str, db: SessionLocal) -> User:
-        """Generate new refresh token for user"""
-        user.jwt_refresh_token = new_refresh_token
-        user.jwt_refresh_token_expiry = datetime.utcnow() + timedelta(
-            days=settings.refresh_token_expiration_days
+    def create_session(user_id: int, refresh_token: str, db: SessionLocal) -> RefreshToken:
+        """Create a new session (one row per logged-in browser/device)"""
+        session = RefreshToken(
+            user_id=user_id,
+            token=refresh_token,
+            expires_at=datetime.utcnow() + timedelta(days=settings.refresh_token_expiration_days)
         )
+        db.add(session)
         db.commit()
-        db.refresh(user)
-        return user
+        db.refresh(session)
+        return session
 
     @staticmethod
-    def logout_user(user: User, db: SessionLocal) -> None:
-        """Logout user by invalidating refresh token"""
-        user.jwt_refresh_token = ""
-        user.jwt_refresh_token_expiry = datetime.utcnow()
+    def get_session_by_token(refresh_token: str, db: SessionLocal) -> Optional[RefreshToken]:
+        """Look up a session by its current refresh token"""
+        return db.query(RefreshToken).filter(RefreshToken.token == refresh_token).first()
+
+    @staticmethod
+    def rotate_session(session: RefreshToken, new_refresh_token: str, db: SessionLocal) -> RefreshToken:
+        """Rotate a session's refresh token in place (single-use tokens)"""
+        session.token = new_refresh_token
+        session.expires_at = datetime.utcnow() + timedelta(days=settings.refresh_token_expiration_days)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @staticmethod
+    def revoke_session(refresh_token: str, db: SessionLocal) -> None:
+        """Log out of a single browser/device by deleting its session"""
+        db.query(RefreshToken).filter(RefreshToken.token == refresh_token).delete()
         db.commit()
 
 

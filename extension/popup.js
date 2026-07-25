@@ -464,8 +464,10 @@ async function handleLogout() {
     await fetch(`${BACKEND_URL}/auth/logout`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${auth.auth.accessToken}`
-      }
+        'Authorization': `Bearer ${auth.auth.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refresh_token: auth.auth.refreshToken })
     });
   } catch (error) {
     console.error('Logout error (continuing):', error);
