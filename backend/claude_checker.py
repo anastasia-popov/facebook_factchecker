@@ -40,6 +40,30 @@ TOOLS = [
             },
             "required": ["query"]
         }
+    },
+    {
+        "name": "submit_fact_check",
+        "description": (
+            "Submit the completed fact-check analysis. This is the ONLY way to return "
+            "your final results - plain text responses are never shown to the user. "
+            "Call this exactly once, after you have used web_search to verify each claim. "
+            "Do not call it to describe what you're about to do; call it only when the "
+            "analysis argument already contains the finished, complete write-up."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "string",
+                    "description": (
+                        "The complete fact-check analysis in markdown, following the required "
+                        "format: Claim / Verdict / Sources / Evidence for each claim. This exact "
+                        "text is shown to the user verbatim."
+                    )
+                }
+            },
+            "required": ["analysis"]
+        }
     }
 ]
 
@@ -75,63 +99,6 @@ async def search_web(query: str) -> list[dict]:
     except Exception as e:
         logger.error(f"Web search error: {e}")
         return []
-
-
-def filter_introductory_sentences(text: str) -> str:
-    """Remove planning/intent statements from response, but keep introductions and analysis."""
-    lines = text.split('\n')
-    filtered_lines = []
-
-    # Only filter out pure planning/intent statements, not introductions
-    planning_patterns = [
-        'will search',
-        'will research',
-        'will check',
-        'will examine',
-        "i'll search",
-        "i'll research",
-        "i'll check",
-        "i'll examine",
-        "i'll analyze",
-        'let me search',
-        'let me research',
-        'let me check',
-        'let me examine',
-        'let me analyze',
-        'let me fact',
-        'searching for',
-        'checking for',
-        'looking for',
-        'examining the',
-    ]
-
-    for line in lines:
-        # Remove leading > signs (Markdown blockquote syntax)
-        line = line.lstrip('>')
-        line_lower = line.lower().strip()
-
-        # Skip if line is empty
-        if not line_lower:
-            filtered_lines.append(line)
-        # Only skip if line contains ONLY planning language with no actual content
-        elif any(pattern in line_lower for pattern in planning_patterns):
-            # Check if line is mostly just the planning statement
-            # If it contains analysis content (verdict, sources, etc.), keep it
-            if any(keyword in line_lower for keyword in ['verdict', 'true', 'false', 'misleading', 'unverified', 'sources', 'url', 'http', '**claim']):
-                # Line has planning text but also analysis - keep it
-                filtered_lines.append(line)
-            elif len(line) < 150:
-                # Short line with just planning language - skip it
-                logger.debug(f"Filtering out planning line: {line[:80]}...")
-                continue
-            else:
-                # Long line might have content mixed in - keep it
-                filtered_lines.append(line)
-        else:
-            filtered_lines.append(line)
-
-    result = '\n'.join(filtered_lines).strip()
-    return result
 
 
 def _format_message_for_log(msg: dict) -> str:
@@ -226,7 +193,7 @@ POST TEXT:
 INSTRUCTIONS:
 1. Identify the key claims in the post
 2. For each claim, use the web_search tool to find PRIMARY SOURCES that support or refute it
-3. Provide a fact-check analysis with:
+3. Once research is complete, call the submit_fact_check tool with the analysis argument containing:
    - **Claim**: [brief statement]
    - **Verdict**: True/False/Misleading/Unverified
    - **Sources**: List primary sources with direct URLs (e.g., official websites, academic papers, government reports)
@@ -235,7 +202,10 @@ INSTRUCTIONS:
 5. PRIORITIZE PRIMARY SOURCES - link to original reports, official statements, peer-reviewed research
 6. INCLUDE DIRECT URLS for all sources in clickable format
 
-Do NOT include introductions, preamble, or explanations of what you'll do - start with the verdict immediately."""
+Do not write the final analysis as a plain text message - it will not be shown to the user. The
+submit_fact_check tool call is the only way to deliver your results. Do not include introductions,
+preamble, or explanations of what you're about to do in plain text; use web_search silently and then
+call submit_fact_check once, directly, with the complete analysis."""
 
     try:
         logger.debug(f"Starting fact-check with Claude (text length: {len(text)})")
@@ -243,8 +213,9 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
         # Message history for multi-turn interaction
         messages = [{"role": "user", "content": prompt}]
 
-        # Tool use loop - continue until we get full analysis, not just introduction
+        # Tool use loop - continue until submit_fact_check is called
         max_iterations = 5
+        final_response = ""
         for iteration in range(max_iterations):
             logger.debug(f"Claude iteration {iteration + 1}/{max_iterations}")
 
@@ -276,15 +247,11 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
 
                 # Check if Claude wants to use tools
                 has_tool_use = False
-                has_text = False
-                text_content = ""
                 tool_results = []
+                submitted_analysis = None
 
                 for content_block in data["content"]:
-                    if content_block.get("type") == "text":
-                        has_text = True
-                        text_content = content_block.get("text", "")
-                    elif content_block.get("type") == "tool_use":
+                    if content_block.get("type") == "tool_use":
                         has_tool_use = True
                         tool_name = content_block.get("name")
                         tool_input = content_block.get("input")
@@ -307,51 +274,34 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                                 "tool_use_id": tool_use_id,
                                 "content": result_text
                             })
+                        elif tool_name == "submit_fact_check":
+                            # Explicit, structural end-of-analysis signal - Claude calling this
+                            # tool is the ONLY way final_response gets set. No more guessing
+                            # intent from free-text keywords (planning language vs. real
+                            # analysis is ambiguous and impossible to regex-match reliably).
+                            submitted_analysis = tool_input.get("analysis", "")
+                            logger.debug(f"Claude submitted final analysis ({len(submitted_analysis)} chars)")
 
-                # Determine if we should continue or stop
-                text_lower = text_content.lower()
-
-                # Check if response is pure planning with no analysis content
-                is_pure_planning = has_text and (
-                    len(text_content) < 150 and (
-                        "will search" in text_lower or
-                        "will research" in text_lower or
-                        "i'll search" in text_lower or
-                        "let me search" in text_lower or
-                        "checking" in text_lower or
-                        "examining" in text_lower
-                    )
-                )
-
-                # Check if response has actual analysis content
-                has_analysis = has_text and any(keyword in text_lower for keyword in [
-                    'verdict', 'true', 'false', 'misleading', 'unverified',
-                    '**claim', 'sources:', 'evidence:', 'analysis'
-                ])
-
-                # Always execute tools if requested (tool_use requires immediate tool_result)
-                if has_tool_use and tool_results:
+                # A submit_fact_check call always ends the loop immediately, even if other
+                # tool_use blocks (e.g. a stray web_search) appeared in the same turn.
+                if submitted_analysis is not None:
+                    final_response = submitted_analysis
+                    break
+                elif has_tool_use and tool_results:
                     logger.debug(f"Claude requested {len(tool_results)} tool(s), continuing iteration")
                     messages.append({"role": "user", "content": tool_results})
                     # Continue the loop to get Claude's next response
-                # If no tools, check if text is pure planning or has actual analysis
-                elif has_text and (has_analysis or not is_pure_planning):
-                    # Claude provided actual analysis or substantial text (not just planning)
-                    logger.debug(f"Claude provided analysis ({len(text_content)} chars), stopping iteration")
-                    break
-                elif has_text and is_pure_planning:
-                    # Claude provided only planning text, ask for actual analysis
-                    logger.debug("Claude provided planning text without analysis, requesting fact-check results")
-                    messages.append({
-                        "role": "user",
-                        "content": "Please provide your fact-checking analysis now. Include the verdict, sources, and evidence for each claim."
-                    })
                 else:
-                    # Claude finished without providing text or tools - ask for analysis
-                    logger.debug("Claude finished without text or tools, requesting final analysis")
+                    # Claude wrote plain text (or nothing) without calling submit_fact_check -
+                    # plain text is never shown to the user, so just ask again.
+                    logger.debug("No submit_fact_check call yet, prompting Claude to submit results")
                     messages.append({
                         "role": "user",
-                        "content": "Based on the information gathered, please provide your complete fact-checking analysis now."
+                        "content": (
+                            "Please call the submit_fact_check tool now with your complete "
+                            "analysis. Plain text responses are not shown to the user - only "
+                            "the submit_fact_check tool call is."
+                        )
                     })
 
             # If we're at the last iteration, break
@@ -359,48 +309,23 @@ Do NOT include introductions, preamble, or explanations of what you'll do - star
                 logger.debug(f"Reached max iterations ({max_iterations}), exiting loop")
                 break
 
-        # Extract final text response - search for best quality response
-        logger.debug(f"Messages length: {len(messages)}")
-
-        final_response = ""
-        responses_to_try = []
-
-        # Collect all assistant text responses (backwards)
-        for i in range(len(messages) - 1, -1, -1):
-            msg = messages[i]
-            logger.debug(f"Checking message {i}, role: {msg.get('role')}")
-            if msg.get("role") == "assistant":
-                content = msg.get("content", [])
-                for content_block in content:
-                    logger.debug(f"Content block type: {content_block.get('type')}")
-                    if content_block.get("type") == "text":
-                        text = content_block.get("text", "")
-                        if text:
-                            responses_to_try.append(text)
-                            logger.debug(f"Found text block: {text[:100]}...")
-
-        if not responses_to_try:
-            logger.error("No text response found in Claude messages")
-            for i, msg in enumerate(messages):
-                logger.error(f"Message {i}: {msg}")
-            raise Exception("Claude did not return text analysis")
-
-        # Filter responses and use the first one that has substantial content
-        for response in responses_to_try:
-            filtered = filter_introductory_sentences(response)
-            if filtered and len(filtered.strip()) > 100:  # Require meaningful content
-                final_response = filtered
-                logger.debug(f"Selected response with {len(final_response)} chars after filtering")
-                break
-
-        # If no filtered response was substantial, use the longest unfiltered one
         if not final_response:
-            final_response = max(responses_to_try, key=len) if responses_to_try else ""
-            logger.warning(f"No substantial filtered response found, using longest response ({len(final_response)} chars)")
+            # Safety net: Claude never called submit_fact_check within max_iterations.
+            # Fall back to the last plain-text block rather than failing outright.
+            logger.warning("Claude never called submit_fact_check, falling back to last text block")
+            for i in range(len(messages) - 1, -1, -1):
+                msg = messages[i]
+                if msg.get("role") == "assistant":
+                    for content_block in msg.get("content", []):
+                        if content_block.get("type") == "text" and content_block.get("text"):
+                            final_response = content_block["text"]
+                            break
+                if final_response:
+                    break
 
-        if not final_response or len(final_response.strip()) == 0:
-            logger.error(f"Final response is empty after processing {len(responses_to_try)} responses")
-            raise Exception("Claude returned only introductory text, no actual analysis")
+        if not final_response or not final_response.strip():
+            logger.error("No final analysis available after processing conversation")
+            raise Exception("Claude did not return a fact-check analysis")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
         dump_conversation(messages, final_response=final_response)
