@@ -214,10 +214,23 @@ call submit_fact_check once, directly, with the complete analysis."""
         messages = [{"role": "user", "content": prompt}]
 
         # Tool use loop - continue until submit_fact_check is called
-        max_iterations = 5
+        max_iterations = 8
         final_response = ""
         for iteration in range(max_iterations):
             logger.debug(f"Claude iteration {iteration + 1}/{max_iterations}")
+
+            is_last_iteration = iteration == max_iterations - 1
+            request_json = {
+                "model": CURRENT_MODEL,
+                "max_tokens": 4000,
+                "tools": TOOLS,
+                "messages": messages
+            }
+            if is_last_iteration:
+                # Out of research turns - force Claude to wrap up with whatever it has
+                # gathered so far instead of risking another round of web_search calls
+                # that would silently run out the clock with nothing ever submitted.
+                request_json["tool_choice"] = {"type": "tool", "name": "submit_fact_check"}
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
@@ -228,12 +241,7 @@ call submit_fact_check once, directly, with the complete analysis."""
                         "content-type": "application/json",
                         "anthropic-dangerous-direct-browser-access": "true"
                     },
-                    json={
-                        "model": CURRENT_MODEL,
-                        "max_tokens": 4000,
-                        "tools": TOOLS,
-                        "messages": messages
-                    }
+                    json=request_json
                 )
 
                 if not response.is_success:
