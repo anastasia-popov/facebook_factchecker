@@ -1,5 +1,5 @@
 .fc-btn {
-  background-color: #2563EB !important;
+  background-color: #1fbed0 !important;
   color: white !important;
   border: none !important;
   border-radius: 6px !important;
@@ -64,7 +64,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #64748B;
+  color: #afeeee;
   font-size: 18px;
   padding: 0;
   line-height: 1;
@@ -126,17 +126,17 @@
 
 .fc-verdict-unverified {
   background-color: #F1F5F9;
-  color: #64748B;
+  color: #afeeee;
 }
 
 .fc-sources {
   margin: 8px 0 0 0;
   font-size: 12px;
-  color: #64748B;
+  color: #afeeee;
 }
 
 .fc-sources a {
-  color: #2563EB;
+  color: #1fbed0;
   text-decoration: none;
   margin-right: 8px;
 }
@@ -149,14 +149,14 @@
   margin: 0;
   padding: 12px;
   text-align: center;
-  color: #64748B;
+  color: #afeeee;
   font-size: 13px;
 }
 
 .fc-claude-response {
   max-height: 600px;
   overflow-y: auto;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   color: #0F172A;
   white-space: pre-wrap;
