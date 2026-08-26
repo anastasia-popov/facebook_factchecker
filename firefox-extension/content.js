@@ -621,13 +621,33 @@
 
     html = parseNestedLists(html);
 
-    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 15px !important; font-weight: 600 !important; color: #1fbed0 !important;">$1</h3>');
-    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #1fbed0 !important;">$1</h2>');
-    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #1fbed0 !important;">$1</h1>');
+    // Claude formats individual claims as a heading at whatever level fits the rest
+    // of its structure that run - most commonly "## Claim N", but sometimes "### Claim N"
+    // or even "# Claim N". Detect the "Claim N" text regardless of heading level and
+    // style it consistently (16px, italic), leaving other headings at that same level
+    // (Overview, Summary, etc.) with their normal size/weight and no italic.
+    const renderHeading = (tag, margin, baseFontSize, baseFontWeight, headingText) => {
+      const isClaimHeader = /^Claim\s*\d+/i.test(headingText.trim());
+      const fontSize = isClaimHeader ? '16px' : baseFontSize;
+      const italicStyle = isClaimHeader ? ' font-style: italic !important;' : '';
+      return `<${tag} style="margin: ${margin} !important; font-size: ${fontSize} !important; font-weight: ${baseFontWeight} !important; color: #1fbed0 !important;${italicStyle}">${headingText}</${tag}>`;
+    };
+    html = html.replace(/^###\s+(.+)$/gm, (match, headingText) => renderHeading('h3', '16px 0 8px 0', '15px', 600, headingText));
+    html = html.replace(/^##\s+(.+)$/gm, (match, headingText) => renderHeading('h2', '18px 0 10px 0', '16px', 700, headingText));
+    html = html.replace(/^#\s+(.+)$/gm, (match, headingText) => renderHeading('h1', '20px 0 12px 0', '18px', 700, headingText));
 
+    // Claude sometimes formats individual claims as inline bold ("**Claim 1:**")
+    // instead of a ### heading - italicize that form too, but not other bold text
+    // (e.g. **Verdict:**, **Sources:**). Must run before the generic bold rule below.
+    html = html.replace(/\*\*(Claim\s*\d+:?)\*\*/gi, '<strong style="color: #1F2937 !important; font-weight: 700 !important; font-style: italic !important; font-size: 16px !important;">$1</strong>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #1F2937 !important; font-weight: 700 !important;">$1</strong>');
 
-    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1fbed0, transparent) !important;"></div></div>');
+    // Consume any blank-line whitespace immediately surrounding the '---' marker
+    // (not just the marker line itself) so the divider's own margin below is the
+    // ONLY source of spacing - otherwise leftover newlines become extra <br> tags
+    // in the final markdown-to-HTML pass, and the gap ends up uneven depending on
+    // how many blank lines Claude happened to put around each divider.
+    html = html.replace(/\n*^-{2,}$\n*/gm, '<div style="margin: 14.4px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1fbed0, transparent) !important;"></div></div>');
 
     html = html.replace(/\n/g, '<br>');
 
@@ -680,7 +700,7 @@
 
     overlay.innerHTML = `
       <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #1fbed0 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;">
-        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #1fbed0 !important;">✓ Fact-Check Analysis</span>
+        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #1fbed0 !important; text-transform: uppercase !important;">✓ Fact-Check Analysis</span>
         <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #afeeee !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
       </div>
       <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
