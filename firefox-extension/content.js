@@ -58,8 +58,8 @@
       selectionBox = document.createElement('div');
       selectionBox.style.cssText = `
         position: fixed;
-        border: 2px solid #1877f2;
-        background: rgba(24, 119, 242, 0.1);
+        border: 2px solid #2563EB;
+        background: rgba(37, 99, 235, 0.1);
         z-index: 99999;
         pointer-events: none;
       `;
@@ -148,8 +148,6 @@
   });
 
   async function performOCR(imageUrl) {
-    let statusDiv;
-
     try {
       // Get auth token
       const auth = await new Promise((resolve) => {
@@ -162,45 +160,13 @@
         throw new Error('Not authenticated. Please log in via the extension popup.');
       }
 
-      // Show loading animation only (no text)
-      statusDiv = document.createElement('div');
-      statusDiv.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      `;
-
-      // Create loading spinner
-      const spinner = document.createElement('div');
-      spinner.style.cssText = `
-        display: inline-block;
-        width: 32px;
-        height: 32px;
-        border: 3px solid #0891B2;
-        border-radius: 50%;
-        border-top-color: transparent;
-        animation: spin 0.8s linear infinite;
-      `;
-
-      // Add animation
-      if (!document.getElementById('spinnerStyle')) {
-        const style = document.createElement('style');
-        style.id = 'spinnerStyle';
-        style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
-        document.head.appendChild(style);
-      }
-
-      statusDiv.appendChild(spinner);
-      document.body.appendChild(statusDiv);
+      // Show the loading overlay now. showLoadingAnimation() is idempotent
+      // (reuses the existing element if one is already on screen), and the
+      // caller feeds a successful extraction straight into performFactCheck(),
+      // which calls showLoadingAnimation() again - reusing this exact same
+      // element/position rather than swapping in a second, separately built
+      // overlay, so there's no hand-off jump between OCR and the fact-check wait.
+      showLoadingAnimation();
 
       // Fetch the image
       let imageBlob;
@@ -243,19 +209,15 @@
       const ocrResult = ocrResponse.result;
       const extractedText = ocrResult.text;
 
-      if (statusDiv && statusDiv.parentNode) {
-        statusDiv.remove();
-      }
-
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error('No text found in the image');
       }
 
+      // Leave the loading overlay showing - the caller immediately proceeds
+      // into performFactCheck(), which reuses this same overlay instance.
       return extractedText;
     } catch (error) {
-      if (statusDiv && statusDiv.parentNode) {
-        statusDiv.remove();
-      }
+      removeLoadingAnimation();
       throw error;
     }
   }
@@ -331,7 +293,7 @@
             bottom: 20px !important;
             right: 20px !important;
             background: white !important;
-            border: 2px solid #1877f2 !important;
+            border: 2px solid #2563EB !important;
             border-radius: 8px !important;
             padding: 12px !important;
             z-index: 999998 !important;
@@ -344,7 +306,7 @@
           title.style.cssText = `
             font-weight: bold !important;
             margin-bottom: 8px !important;
-            color: #1877f2 !important;
+            color: #2563EB !important;
             font-size: 12px !important;
           `;
           imageLinksDiv.appendChild(title);
@@ -374,7 +336,7 @@
                 width: 100% !important;
                 margin: 4px 0 !important;
                 padding: 8px !important;
-                background: #1877f2 !important;
+                background: #2563EB !important;
                 color: white !important;
                 border: none !important;
                 border-radius: 4px !important;
@@ -488,7 +450,7 @@
       styleSheet.id = 'fc-link-styles';
       styleSheet.textContent = `
         a.fc-link {
-          color: #0891B2 !important;
+          color: #2563EB !important;
           text-decoration: none !important;
           font-weight: 500 !important;
           transition: text-decoration 0.2s !important;
@@ -542,10 +504,10 @@
   // Visual identity per nesting depth: bullet glyph, color and ordered-list numbering style.
   // Depth cycles back to index 0 style after LIST_DEPTH_STYLES.length levels.
   const LIST_DEPTH_STYLES = [
-    { bullet: '•', color: '#0891B2', olType: 'decimal' },
-    { bullet: '◦', color: '#0E7490', olType: 'lower-alpha' },
-    { bullet: '▪', color: '#155E75', olType: 'lower-roman' },
-    { bullet: '‣', color: '#164E63', olType: 'decimal' },
+    { bullet: '•', color: '#2563EB', olType: 'decimal' },
+    { bullet: '◦', color: '#0F172A', olType: 'lower-alpha' },
+    { bullet: '▪', color: '#64748B', olType: 'lower-roman' },
+    { bullet: '‣', color: '#93C5FD', olType: 'decimal' },
   ];
 
   function parseNestedLists(text) {
@@ -641,7 +603,7 @@
 
         const tagName = isHeader ? 'th' : 'td';
         const cellStyle = isHeader
-          ? 'style="background: #F0F9FB !important; color: #0891B2 !important; font-weight: 700 !important; padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
+          ? 'style="background: #F8FAFC !important; color: #2563EB !important; font-weight: 700 !important; padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
           : 'style="padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"';
 
         tableHtml += `<tr>`;
@@ -659,13 +621,13 @@
 
     html = parseNestedLists(html);
 
-    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #0891B2 !important;">$1</h3>');
-    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h2>');
-    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #0891B2 !important;">$1</h1>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h3 style="margin: 16px 0 8px 0 !important; font-size: 14px !important; font-weight: 600 !important; color: #2563EB !important;">$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h2 style="margin: 18px 0 10px 0 !important; font-size: 16px !important; font-weight: 700 !important; color: #2563EB !important;">$1</h2>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h1 style="margin: 20px 0 12px 0 !important; font-size: 18px !important; font-weight: 700 !important; color: #2563EB !important;">$1</h1>');
 
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #1F2937 !important; font-weight: 700 !important;">$1</strong>');
 
-    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #0891B2, transparent) !important;"></div></div>');
+    html = html.replace(/^-{2,}$/gm, '<div style="margin: 16px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #2563EB, transparent) !important;"></div></div>');
 
     html = html.replace(/\n/g, '<br>');
 
@@ -694,7 +656,7 @@
       padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #374151 !important;
+      color: #0F172A !important;
       z-index: 999999 !important;
       line-height: 1.6 !important;
       width: 90% !important;
@@ -708,18 +670,18 @@
     const responseHtml = markdownToHtml(responseText);
 
     const originalTextHtml = originalText ? `
-      <div style="background: #F0F9FB !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #0891B2 !important; border-radius: 6px !important;">
-        <div style="font-weight: 700 !important; font-size: 12px !important; color: #0891B2 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;">📝 Original Text:</div>
-        <div style="font-weight: 700 !important; font-size: 15px !important; color: #4B5563 !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-style: italic !important; letter-spacing: 0.3px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
+      <div style="background: #F8FAFC !important; padding: 14px !important; margin-bottom: 16px !important; border-left: 4px solid #2563EB !important; border-radius: 6px !important;">
+        <div style="font-weight: 700 !important; font-size: 12px !important; color: #2563EB !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;">📝 Original Text:</div>
+        <div style="font-weight: 700 !important; font-size: 15px !important; color: #64748B !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-style: italic !important; letter-spacing: 0.3px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
           ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
         </div>
       </div>
     ` : '';
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #0891B2 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F0F9FB 0%, #F5FEFB 100%) !important;">
-        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #0891B2 !important;">✓ Fact-Check Analysis</span>
-        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #9CA3AF !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #2563EB !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;">
+        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #2563EB !important;">✓ Fact-Check Analysis</span>
+        <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #64748B !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
       </div>
       <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
         ${originalTextHtml}
@@ -732,10 +694,10 @@
       overlay.remove();
     });
     closeBtn.addEventListener('mouseover', () => {
-      closeBtn.style.color = '#374151 !important';
+      closeBtn.style.color = '#0F172A !important';
     });
     closeBtn.addEventListener('mouseout', () => {
-      closeBtn.style.color = '#9CA3AF !important';
+      closeBtn.style.color = '#64748B !important';
     });
 
     // Make overlay draggable from header
@@ -783,7 +745,71 @@
     });
   }
 
+  // "Loader" by Nawsome - https://uiverse.io/Nawsome/new-snail-22
+  // License: MIT (https://github.com/uiverse-io/galaxy/blob/main/LICENSE)
+  // Copyright (c) Uiverse.io contributors
+  // Used as-is except for size (configurable per instance) and color
+  // (changed from the original #000 to #afeeee). Shared by every loading
+  // state (OCR image fetch, fact-check wait) so the same loader stays on
+  // screen throughout instead of switching between different animations.
+  const FC_SPINNER_SIZE_PX = 130;
+
+  function ensureSpinnerStyleInjected() {
+    if (document.getElementById('spinnerStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'spinnerStyle';
+    style.textContent = `
+      .fc-semicircle-spinner,
+      .fc-semicircle-spinner div {
+        width: 100%;
+        height: 100%;
+        animation: fcRotate141 6s infinite linear;
+        background-repeat: no-repeat;
+        border-radius: 50%;
+        position: relative;
+        overflow: hidden;
+      }
+      .fc-semicircle-spinner div {
+        position: absolute;
+        top: 5%;
+        left: 5%;
+        width: 90%;
+        height: 90%;
+      }
+      .fc-semicircle-spinner:before,
+      .fc-semicircle-spinner div:before {
+        content: '';
+        width: 100%;
+        height: 50%;
+        display: block;
+        background: radial-gradient(transparent, transparent 65%, #afeeee 65%, #afeeee);
+        background-size: 100% 200%;
+      }
+      @keyframes fcRotate141 {
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function createSemicircleSpinner(sizePx) {
+    ensureSpinnerStyleInjected();
+    const spinner = document.createElement('div');
+    spinner.className = 'fc-semicircle-spinner';
+    spinner.style.width = sizePx + 'px';
+    spinner.style.height = sizePx + 'px';
+    spinner.innerHTML = '<div><div><div><div><div><div><div><div></div></div></div></div></div></div></div></div>';
+    return spinner;
+  }
+
   function showLoadingAnimation() {
+    // Idempotent: if the overlay is already on screen (e.g. left up by
+    // performOCR() while handing off into the fact-check wait), reuse the
+    // same element in place instead of creating a second one, so there's
+    // no position jump between the two loading phases.
+    const alreadyShowing = document.getElementById('fc-loading-overlay');
+    if (alreadyShowing) return alreadyShowing;
+
     const overlay = document.createElement('div');
     overlay.className = 'fc-overlay fc-overlay-loading';
     overlay.setAttribute('data-fc-overlay', 'true');
@@ -793,17 +819,17 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: transparent !important;
+      background: #ffffff !important;
       border: none !important;
-      border-radius: 12px !important;
+      border-radius: 50% !important;
       padding: 0 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 14px !important;
-      color: #374151 !important;
+      color: #0F172A !important;
       z-index: 999999 !important;
-      box-shadow: none !important;
-      width: 300px !important;
-      height: 300px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25) !important;
+      width: 170px !important;
+      height: 170px !important;
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
@@ -811,36 +837,7 @@
       gap: 0 !important;
     `;
 
-    overlay.innerHTML = `
-      <div style="width: 100%; height: 85%; flex: 1;">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-          <defs>
-            <filter height="140%" id="glass-shadow" width="140%" x="-20%" y="-20%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="2"></feGaussianBlur>
-              <feOffset dx="1" dy="1" result="offsetblur"></feOffset>
-              <feComponentTransfer>
-                <feFuncA slope="0.3" type="linear"></feFuncA>
-              </feComponentTransfer>
-              <feMerge>
-                <feMergeNode></feMergeNode>
-                <feMergeNode in="SourceGraphic"></feMergeNode>
-              </feMerge>
-            </filter>
-          </defs>
-          <g filter="url(#glass-shadow)">
-            <g>
-              <animateMotion dur="4s" path="M 50,35 A 15,15 0 1 1 49.99,35 Z" repeatCount="indefinite"></animateMotion>
-              <g transform="rotate(-45)">
-                <rect fill="#0a6b8a" height="25" rx="1" width="6" x="-3" y="15"></rect>
-                <circle cx="0" cy="0" fill="none" r="18" stroke="#0a6b8a" stroke-width="6"></circle>
-                <circle cx="0" cy="0" fill="rgba(8, 145, 178, 0.15)" r="16"></circle>
-                <path d="M-8 -8 Q -4 -12 0 -8" fill="none" opacity="0.6" stroke="white" stroke-linecap="round" stroke-width="1.5"></path>
-              </g>
-            </g>
-          </g>
-        </svg>
-      </div>
-    `;
+    overlay.appendChild(createSemicircleSpinner(FC_SPINNER_SIZE_PX));
 
     // Entire widget acts as the drag handle (no header, just the animation) so users
     // can move it aside and keep working on the page while the analysis runs.
@@ -866,13 +863,13 @@
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      background: #FEF2F2 !important;
-      border: 1px solid #FECACA !important;
+      background: #FEE2E2 !important;
+      border: 1px solid #FCA5A5 !important;
       border-radius: 12px !important;
       padding: 16px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 13px !important;
-      color: #7F1D1D !important;
+      color: #DC2626 !important;
       z-index: 999999 !important;
       box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
       max-width: 400px !important;
@@ -883,15 +880,15 @@
     overlay.innerHTML = `
       <span class="fc-error-icon" style="font-size: 20px !important; flex-shrink: 0 !important;">⚠️</span>
       <span style="flex: 1 !important;">${escapeHtml(message)}</span>
-      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #D97706 !important; padding: 0 !important; transition: color 0.2s !important;">✕</button>
+      <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 18px !important; color: #F59E0B !important; padding: 0 !important; transition: color 0.2s !important;">✕</button>
     `;
     const errorCloseBtn = overlay.querySelector('.fc-close');
     errorCloseBtn.addEventListener('click', () => overlay.remove());
     errorCloseBtn.addEventListener('mouseover', () => {
-      errorCloseBtn.style.color = '#7F1D1D !important';
+      errorCloseBtn.style.color = '#DC2626 !important';
     });
     errorCloseBtn.addEventListener('mouseout', () => {
-      errorCloseBtn.style.color = '#D97706 !important';
+      errorCloseBtn.style.color = '#F59E0B !important';
     });
     document.body.appendChild(overlay);
   }
@@ -906,12 +903,12 @@
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
       background: #FFFFFF !important;
-      border: 2px solid #0891B2 !important;
+      border: 2px solid #2563EB !important;
       border-radius: 12px !important;
       padding: 32px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       font-size: 14px !important;
-      color: #374151 !important;
+      color: #0F172A !important;
       z-index: 999999 !important;
       box-shadow: 0 20px 50px rgba(0,0,0,0.15) !important;
       max-width: 420px !important;
@@ -923,12 +920,12 @@
     `;
     overlay.innerHTML = `
       <div style="font-size: 48px !important;">🔐</div>
-      <div style="font-size: 18px !important; font-weight: 700 !important; color: #0891B2 !important;">Sign In Required</div>
+      <div style="font-size: 18px !important; font-weight: 700 !important; color: #2563EB !important;">Sign In Required</div>
       <div style="font-size: 14px !important; color: #6B7280 !important; line-height: 1.5 !important;">
         You need to be logged in to fact-check posts. Click the button below to open the extension and sign in with your Google account.
       </div>
       <button id="fc-login-btn" style="
-        background-color: #0891B2 !important;
+        background-color: #2563EB !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
@@ -962,10 +959,10 @@
       });
     });
     loginBtn.addEventListener('mouseover', () => {
-      loginBtn.style.backgroundColor = '#0a6b8a !important';
+      loginBtn.style.backgroundColor = '#1D4ED8 !important';
     });
     loginBtn.addEventListener('mouseout', () => {
-      loginBtn.style.backgroundColor = '#0891B2 !important';
+      loginBtn.style.backgroundColor = '#2563EB !important';
     });
 
     const closeBtn = overlay.querySelector('.fc-close');
@@ -1203,6 +1200,7 @@
           if (extractedText && extractedText.trim().length > 0) {
             performFactCheck(extractedText, document.body);
           } else {
+            removeLoadingAnimation();
             showError(document.body, 'No text found in the image. Please try another image.');
           }
         })
@@ -1223,6 +1221,7 @@
             if (extractedText && extractedText.trim().length > 0) {
               performFactCheck(extractedText, document.body);
             } else {
+              removeLoadingAnimation();
               showError(document.body, 'No text found in the image. Please try another image.');
             }
           })
