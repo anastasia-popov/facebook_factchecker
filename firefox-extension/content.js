@@ -58,7 +58,7 @@
       selectionBox = document.createElement('div');
       selectionBox.style.cssText = `
         position: fixed;
-        border: 2px solid #1fbed0;
+        border: 2px solid #1898a6;
         background: rgba(31, 190, 208, 0.1);
         z-index: 99999;
         pointer-events: none;
@@ -293,7 +293,7 @@
             bottom: 20px !important;
             right: 20px !important;
             background: white !important;
-            border: 2px solid #1fbed0 !important;
+            border: 2px solid #1898a6 !important;
             border-radius: 8px !important;
             padding: 12px !important;
             z-index: 999998 !important;
@@ -306,7 +306,7 @@
           title.style.cssText = `
             font-weight: bold !important;
             margin-bottom: 8px !important;
-            color: #1fbed0 !important;
+            color: #1898a6 !important;
             font-size: 12px !important;
           `;
           imageLinksDiv.appendChild(title);
@@ -336,7 +336,7 @@
                 width: 100% !important;
                 margin: 4px 0 !important;
                 padding: 8px !important;
-                background: #1fbed0 !important;
+                background: #1898a6 !important;
                 color: white !important;
                 border: none !important;
                 border-radius: 4px !important;
@@ -450,7 +450,7 @@
       styleSheet.id = 'fc-link-styles';
       styleSheet.textContent = `
         a.fc-link {
-          color: #1fbed0 !important;
+          color: #1898a6 !important;
           text-decoration: none !important;
           font-weight: 500 !important;
           transition: text-decoration 0.2s !important;
@@ -504,7 +504,7 @@
   // Visual identity per nesting depth: bullet glyph, color and ordered-list numbering style.
   // Depth cycles back to index 0 style after LIST_DEPTH_STYLES.length levels.
   const LIST_DEPTH_STYLES = [
-    { bullet: '•', color: '#1fbed0', olType: 'decimal' },
+    { bullet: '•', color: '#1898a6', olType: 'decimal' },
     { bullet: '◦', color: '#0F172A', olType: 'lower-alpha' },
     { bullet: '▪', color: '#1e6e76', olType: 'lower-roman' },
     { bullet: '‣', color: '#93C5FD', olType: 'decimal' },
@@ -603,7 +603,7 @@
 
         const tagName = isHeader ? 'th' : 'td';
         const cellStyle = isHeader
-          ? 'style="background: #F8FAFC !important; color: #1fbed0 !important; font-weight: 700 !important; padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
+          ? 'style="background: #F8FAFC !important; color: #1898a6 !important; font-weight: 700 !important; padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"'
           : 'style="padding: 12px !important; border: 1px solid #E5E7EB !important; text-align: left !important;"';
 
         tableHtml += `<tr>`;
@@ -630,7 +630,7 @@
       const isClaimHeader = /^Claim\s*\d+/i.test(headingText.trim());
       const fontSize = isClaimHeader ? '16px' : baseFontSize;
       const italicStyle = isClaimHeader ? ' font-style: italic !important;' : '';
-      return `<${tag} style="margin: ${margin} !important; font-size: ${fontSize} !important; font-weight: ${baseFontWeight} !important; color: #1fbed0 !important;${italicStyle}">${headingText}</${tag}>`;
+      return `<${tag} style="margin: ${margin} !important; font-size: ${fontSize} !important; font-weight: ${baseFontWeight} !important; color: #1898a6 !important;${italicStyle}">${headingText}</${tag}>`;
     };
     html = html.replace(/^###\s+(.+)$/gm, (match, headingText) => renderHeading('h3', '16px 0 8px 0', '15px', 600, headingText));
     html = html.replace(/^##\s+(.+)$/gm, (match, headingText) => renderHeading('h2', '18px 0 10px 0', '16px', 700, headingText));
@@ -647,7 +647,7 @@
     // ONLY source of spacing - otherwise leftover newlines become extra <br> tags
     // in the final markdown-to-HTML pass, and the gap ends up uneven depending on
     // how many blank lines Claude happened to put around each divider.
-    html = html.replace(/\n*^-{2,}$\n*/gm, '<div style="margin: 14.4px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1fbed0, transparent) !important;"></div></div>');
+    html = html.replace(/\n*^-{2,}$\n*/gm, '<div style="margin: 14.4px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1898a6, transparent) !important;"></div></div>');
 
     html = html.replace(/\n/g, '<br>');
 
@@ -690,9 +690,9 @@
     const responseHtml = markdownToHtml(responseText);
 
     const originalTextHtml = originalText ? `
-      <div style="background: #F8FAFC !important; padding: 14px !important; margin-bottom: 0 !important; border-left: 4px solid #1fbed0 !important; border-radius: 6px !important;">
-        <div style="font-weight: 700 !important; font-size: 12px !important; color: #1fbed0 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;">📝 Original Text:</div>
-        <div style="font-weight: 700 !important; font-size: 15px !important; color: #1fbed0 !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-style: italic !important; letter-spacing: 0.3px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
+      <div style="background: #F8FAFC !important; padding: 14px !important; margin-bottom: 0 !important; border-left: 4px solid #1898a6 !important; border-radius: 6px !important;">
+        <div style="font-weight: 700 !important; font-size: 12px !important; color: #1898a6 !important; margin-bottom: 8px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;">📝 Original Text:</div>
+        <div style="font-weight: 700 !important; font-size: 15px !important; color: #1898a6 !important; word-wrap: break-word !important; max-height: 120px !important; overflow-y: auto !important; line-height: 1.5 !important; font-style: italic !important; letter-spacing: 0.3px !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important; margin: 0 !important; padding: 0 !important;">
           ${escapeHtml(originalText.substring(0, 500))}${originalText.length > 500 ? '...' : ''}
         </div>
       </div>
@@ -700,12 +700,12 @@
            divider (h1/h2/h3, whichever Claude used for its title) carries its own
            ~18-20px margin-top, so the two together roughly match this divider's own
            top margin - keeping the visual gap before and after the line even. -->
-      <div style="margin: 32px 0 14.4px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1fbed0, transparent) !important;"></div></div>
+      <div style="margin: 32px 0 14.4px 0 !important; text-align: center !important;"><div style="display: inline-block !important; width: 80% !important; height: 2px !important; background: linear-gradient(180deg, transparent, #1898a6, transparent) !important;"></div></div>
     ` : '';
 
     overlay.innerHTML = `
-      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #1fbed0 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;">
-        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #1fbed0 !important; text-transform: uppercase !important;">✓ Fact-Check Analysis</span>
+      <div class="fc-header" style="display: flex !important; justify-content: space-between !important; align-items: center !important; padding: 16px 20px !important; border-bottom: 2px solid #1898a6 !important; flex-shrink: 0 !important; background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%) !important;">
+        <span class="fc-title" style="font-weight: 700 !important; font-size: 15px !important; color: #1898a6 !important; text-transform: uppercase !important;">✓ Fact-Check Analysis</span>
         <button class="fc-close" aria-label="Close" style="background: none !important; border: none !important; cursor: pointer !important; font-size: 20px !important; color: #1e6e76 !important; padding: 0 !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: color 0.2s !important;">✕</button>
       </div>
       <div class="fc-claude-response" style="flex: 1 !important; overflow-y: auto !important; padding: 20px !important; white-space: normal !important; word-wrap: break-word !important; background: #FFFFFF !important;">
@@ -774,7 +774,7 @@
   // License: MIT (https://github.com/uiverse-io/galaxy/blob/main/LICENSE)
   // Copyright (c) Uiverse.io contributors
   // Used as-is except for size (configurable per instance) and color
-  // (changed from the original #000 to #1fbed0). Shared by every loading
+  // (changed from the original #000 to #1898a6). Shared by every loading
   // state (OCR image fetch, fact-check wait) so the same loader stays on
   // screen throughout instead of switching between different animations.
   const FC_SPINNER_SIZE_PX = 130;
@@ -807,7 +807,7 @@
         width: 100%;
         height: 50%;
         display: block;
-        background: radial-gradient(transparent, transparent 65%, #1fbed0 65%, #1fbed0);
+        background: radial-gradient(transparent, transparent 65%, #1898a6 65%, #1898a6);
         background-size: 100% 200%;
       }
       @keyframes fcRotate141 {
@@ -928,7 +928,7 @@
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
       background: #FFFFFF !important;
-      border: 2px solid #1fbed0 !important;
+      border: 2px solid #1898a6 !important;
       border-radius: 12px !important;
       padding: 32px !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
@@ -945,12 +945,12 @@
     `;
     overlay.innerHTML = `
       <div style="font-size: 48px !important;">🔐</div>
-      <div style="font-size: 18px !important; font-weight: 700 !important; color: #1fbed0 !important;">Sign In Required</div>
+      <div style="font-size: 18px !important; font-weight: 700 !important; color: #1898a6 !important;">Sign In Required</div>
       <div style="font-size: 14px !important; color: #6B7280 !important; line-height: 1.5 !important;">
         You need to be logged in to fact-check posts. Click the button below to open the extension and sign in with your Google account.
       </div>
       <button id="fc-login-btn" style="
-        background-color: #1fbed0 !important;
+        background-color: #1898a6 !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
@@ -987,7 +987,7 @@
       loginBtn.style.backgroundColor = '#1D4ED8 !important';
     });
     loginBtn.addEventListener('mouseout', () => {
-      loginBtn.style.backgroundColor = '#1fbed0 !important';
+      loginBtn.style.backgroundColor = '#1898a6 !important';
     });
 
     const closeBtn = overlay.querySelector('.fc-close');
