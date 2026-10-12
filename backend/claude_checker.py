@@ -25,6 +25,27 @@ AVAILABLE_MODELS = {
     "opus": "claude-opus-4-8"
 }
 
+# Per-model $/million-token rates, used to turn the token counts Claude
+# returns in each response's "usage" field into an actual dollar cost.
+CLAUDE_PRICING = {
+    AVAILABLE_MODELS["sonnet"]: {
+        "input": settings.claude_sonnet_input_price_per_mtok,
+        "output": settings.claude_sonnet_output_price_per_mtok,
+    },
+    AVAILABLE_MODELS["opus"]: {
+        "input": settings.claude_opus_input_price_per_mtok,
+        "output": settings.claude_opus_output_price_per_mtok,
+    },
+}
+
+
+def _claude_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Compute $ cost for one Claude call from its token usage."""
+    pricing = CLAUDE_PRICING.get(model)
+    if not pricing:
+        return 0.0
+    return (input_tokens / 1_000_000) * pricing["input"] + (output_tokens / 1_000_000) * pricing["output"]
+
 # Tool definitions for Claude
 TOOLS = [
     {
@@ -123,7 +144,7 @@ def _format_message_for_log(msg: dict) -> str:
     return f"[{role}]\n" + "\n".join(parts)
 
 
-def dump_conversation(messages: list, final_response: str = None, error: str = None) -> None:
+def dump_conversation(messages: list, final_response: str = None, error: str = None, cost: dict = None) -> None:
     """Append the full Claude conversation to a log file.
 
     Each call's transcript is appended as one entry, separated from the
@@ -135,6 +156,15 @@ def dump_conversation(messages: list, final_response: str = None, error: str = N
         lines = [f"Timestamp: {datetime.utcnow().isoformat()}Z", f"Model: {CURRENT_MODEL}", ""]
         for msg in messages:
             lines.append(_format_message_for_log(msg))
+            lines.append("")
+
+        if cost:
+            lines.append(
+                f"[COST] Claude: ${cost['claude_cost_usd']:.6f} "
+                f"({cost['claude_input_tokens']} in / {cost['claude_output_tokens']} out tokens) | "
+                f"Serper: ${cost['serper_cost_usd']:.6f} ({cost['serper_calls']} calls) | "
+                f"Total: ${cost['total_cost_usd']:.6f}"
+            )
             lines.append("")
 
         if final_response:
@@ -154,10 +184,35 @@ def dump_conversation(messages: list, final_response: str = None, error: str = N
         logger.error(f"Failed to write conversation log: {log_error}")
 
 
-async def fact_check_with_claude(text: str) -> str:
-    """Send text to Claude for comprehensive fact-checking with web search tools."""
+async def fact_check_with_claude(text: str) -> tuple[str, dict]:
+    """Send text to Claude for comprehensive fact-checking with web search tools.
+
+    Returns (analysis, cost_breakdown) where cost_breakdown reports the
+    estimated $ cost of this single fact-check across every Claude call and
+    Serper search made while producing it.
+    """
     if not settings.claude_api_key:
         raise Exception("CLAUDE_API_KEY not configured")
+
+    # Running totals used to compute the actual $ cost of this fact-check -
+    # neither Claude nor Serper report a dollar amount themselves, so we sum
+    # token usage / call counts here and price them via CLAUDE_PRICING /
+    # settings.serper_price_per_query once the fact-check completes.
+    total_input_tokens = 0
+    total_output_tokens = 0
+    serper_call_count = 0
+
+    def build_cost_breakdown() -> dict:
+        claude_cost = _claude_cost(CURRENT_MODEL, total_input_tokens, total_output_tokens)
+        serper_cost = serper_call_count * settings.serper_price_per_query
+        return {
+            "claude_input_tokens": total_input_tokens,
+            "claude_output_tokens": total_output_tokens,
+            "claude_cost_usd": round(claude_cost, 6),
+            "serper_calls": serper_call_count,
+            "serper_cost_usd": round(serper_cost, 6),
+            "total_cost_usd": round(claude_cost + serper_cost, 6),
+        }
 
     # Extract key claims from text (simple split by sentences)
     sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 10][:5]
@@ -166,6 +221,7 @@ async def fact_check_with_claude(text: str) -> str:
     search_context = []
     for sentence in sentences[:3]:  # Limit to top 3 claims
         logger.debug(f"Searching web for: {sentence[:50]}...")
+        serper_call_count += 1
         results = await search_web(sentence)
         if results:
             search_context.append({
@@ -250,6 +306,10 @@ call submit_fact_check once, directly, with the complete analysis."""
                     raise Exception(f"Claude API error: {error_data.get('error', {}).get('message', 'Unknown error')}")
 
                 data = response.json()
+                usage = data.get("usage", {})
+                total_input_tokens += usage.get("input_tokens", 0)
+                total_output_tokens += usage.get("output_tokens", 0)
+
                 assistant_message = {"role": "assistant", "content": data["content"]}
                 messages.append(assistant_message)
 
@@ -270,6 +330,7 @@ call submit_fact_check once, directly, with the complete analysis."""
                         if tool_name == "web_search":
                             query = tool_input.get("query")
                             logger.debug(f"Performing web search: {query}")
+                            serper_call_count += 1
                             results = await search_web(query)
 
                             # Format results for Claude
@@ -336,8 +397,9 @@ call submit_fact_check once, directly, with the complete analysis."""
             raise Exception("Claude did not return a fact-check analysis")
 
         logger.debug(f"Claude analysis complete (length: {len(final_response)})")
-        dump_conversation(messages, final_response=final_response)
-        return final_response
+        cost = build_cost_breakdown()
+        dump_conversation(messages, final_response=final_response, cost=cost)
+        return final_response, cost
 
     except httpx.TimeoutException as e:
         logger.error(f"Claude API request timed out: {e}")
@@ -346,11 +408,12 @@ call submit_fact_check once, directly, with the complete analysis."""
             for content_block in messages[-1].get("content", []):
                 if content_block.get("type") == "text":
                     partial_text = content_block.get("text", "Analysis timed out. Partial results above.")
-                    dump_conversation(messages, final_response=partial_text, error="TIMEOUT (partial result returned)")
-                    return partial_text
-        dump_conversation(messages, error="TIMEOUT (no partial result available)")
+                    cost = build_cost_breakdown()
+                    dump_conversation(messages, final_response=partial_text, error="TIMEOUT (partial result returned)", cost=cost)
+                    return partial_text, cost
+        dump_conversation(messages, error="TIMEOUT (no partial result available)", cost=build_cost_breakdown())
         raise Exception("Fact-checking request timed out. Please try again.")
     except Exception as e:
         logger.error(f"Claude fact-check request failed: {e}", exc_info=True)
-        dump_conversation(messages, error=str(e))
+        dump_conversation(messages, error=str(e), cost=build_cost_breakdown())
         raise

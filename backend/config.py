@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     # Backend URL (for OAuth redirects)
     backend_url: str = "http://localhost:8000"
 
+    # Per-request cost estimation for fact-checks. Neither Claude nor Serper
+    # return a dollar amount in their API responses - these rates (USD) are
+    # what we multiply usage by. They must match your actual Anthropic/Serper
+    # billing plan; verify against your account's pricing page and update via
+    # env vars if your plan differs from these defaults.
+    claude_sonnet_input_price_per_mtok: float = 3.0
+    claude_sonnet_output_price_per_mtok: float = 15.0
+    claude_opus_input_price_per_mtok: float = 15.0
+    claude_opus_output_price_per_mtok: float = 75.0
+    serper_price_per_query: float = 0.001
+
     @field_validator('jwt_secret_key')
     @classmethod
     def jwt_secret_must_be_strong(cls, v):

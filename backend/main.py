@@ -450,8 +450,14 @@ async def claude_fact_check(
 
     try:
         logger.debug(f"[{user.google_email}] Processing text with Claude: {req.text[:100]}...")
-        analysis = await fact_check_with_claude(req.text)
+        analysis, cost = await fact_check_with_claude(req.text)
         logger.debug(f"[{user.google_email}] Claude analysis complete (length: {len(analysis)})")
+        logger.info(
+            f"[{user.google_email}] Fact-check cost: ${cost['total_cost_usd']:.6f} "
+            f"(Claude ${cost['claude_cost_usd']:.6f} for {cost['claude_input_tokens']} in / "
+            f"{cost['claude_output_tokens']} out tokens, Serper ${cost['serper_cost_usd']:.6f} "
+            f"for {cost['serper_calls']} calls)"
+        )
 
         if not analysis or len(analysis.strip()) == 0:
             logger.error("Claude returned empty analysis")
